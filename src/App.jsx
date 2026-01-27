@@ -6,6 +6,7 @@ import Register from './pages/Register/index.jsx';
 import UserCenter from './pages/UserCenter/index.jsx';
 import VideoDetail from './pages/VideoDetail/index.jsx';
 import Home from './pages/Home/index.jsx';
+import Upload from './pages/Upload/index.jsx'; // 新增导入
 import './App.css'
 import AuthRoute from "./components/AuthRoute.jsx";
 import Settings from "./pages/Settings/index.jsx";
@@ -23,13 +24,18 @@ function App() {
                             <UserCenter />
                         </AuthRoute>
                     } />
+                    <Route path="settings" element={
+                        <AuthRoute>
+                            <Settings />
+                        </AuthRoute>
+                    } />
+                    {/* 添加上传路由 */}
+                    <Route path="upload" element={
+                        <AuthRoute>
+                            <Upload />
+                        </AuthRoute>
+                    } />
                 </Route>
-
-                <Route path="/settings" element={
-                    <AuthRoute>
-                        <Settings />
-                    </AuthRoute>
-                } />
 
                 {/* 独立页面（无布局） */}
                 <Route path="/login" element={<Login />} />

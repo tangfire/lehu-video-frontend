@@ -1,0 +1,352 @@
+/* 上传页面样式增强 */
+
+.upload-container {
+    min-height: calc(100vh - 70px);
+    padding: 40px 20px;
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+}
+
+.upload-card {
+    max-width: 800px;
+    margin: 0 auto;
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+    padding: 40px;
+}
+
+.upload-title {
+    text-align: center;
+    color: #333;
+    margin-bottom: 30px;
+    font-size: 32px;
+}
+
+/* 步骤信息 */
+.step-message {
+    text-align: center;
+    color: #667eea;
+    font-weight: 500;
+    margin-bottom: 10px;
+    font-size: 16px;
+    animation: fadeIn 0.5s ease;
+}
+
+.progress-section {
+    margin-bottom: 30px;
+}
+
+/* 进度条 */
+.progress-container {
+    margin: 10px 0;
+    background: #f0f0f0;
+    border-radius: 10px;
+    overflow: hidden;
+    height: 24px;
+}
+
+.progress-bar {
+    height: 100%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 10px;
+    transition: width 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 10px;
+    min-width: 60px;
+}
+
+.progress-text {
+    color: white;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+/* 表单区域 */
+.form-section {
+    margin-bottom: 40px;
+}
+
+.form-section h3 {
+    color: #333;
+    margin-bottom: 15px;
+    font-size: 18px;
+    border-bottom: 2px solid #f0f0f0;
+    padding-bottom: 8px;
+}
+
+.form-section h3:after {
+    content: " *";
+    color: #ff4757;
+    visibility: hidden;
+}
+
+.form-section h3[data-required="false"]:after {
+    visibility: hidden;
+}
+
+/* 文件拖放区域 */
+.file-dropzone {
+    border: 2px dashed #ddd;
+    border-radius: 12px;
+    padding: 40px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s;
+    background: #fafafa;
+}
+
+.file-dropzone:hover:not(:disabled) {
+    border-color: #667eea;
+    background: #f8f9ff;
+}
+
+.file-dropzone.has-file {
+    border-color: #4caf50;
+    background: #f1f8e9;
+}
+
+.file-dropzone:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.file-prompt {
+    color: #666;
+}
+
+.upload-icon {
+    font-size: 48px;
+    margin-bottom: 15px;
+    opacity: 0.6;
+}
+
+.file-hint {
+    font-size: 12px;
+    color: #999;
+    margin-top: 5px;
+}
+
+.file-info {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+}
+
+.file-icon {
+    font-size: 36px;
+}
+
+.file-details {
+    text-align: left;
+}
+
+.file-name {
+    font-weight: 500;
+    color: #333;
+    margin-bottom: 5px;
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.file-size,
+.file-type {
+    font-size: 12px;
+    color: #666;
+}
+
+/* 表单输入 */
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: #333;
+}
+
+.form-group label[data-required="true"]:after {
+    content: " *";
+    color: #ff4757;
+}
+
+.form-group input,
+.form-group textarea {
+    width: 100%;
+    padding: 12px 15px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+    transition: all 0.3s;
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.form-group input:disabled,
+.form-group textarea:disabled {
+    background: #f5f5f5;
+    cursor: not-allowed;
+}
+
+/* 操作按钮 */
+.form-actions {
+    display: flex;
+    gap: 15px;
+    margin-top: 30px;
+}
+
+.submit-btn,
+.cancel-btn {
+    flex: 1;
+    padding: 14px;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.submit-btn {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+}
+
+.submit-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+}
+
+.submit-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.cancel-btn {
+    background: #f5f5f5;
+    color: #666;
+    border: 1px solid #ddd;
+}
+
+.cancel-btn:hover:not(:disabled) {
+    background: #e8e8e8;
+}
+
+.cancel-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* 上传提示 */
+.upload-tips {
+    margin-top: 30px;
+    padding: 20px;
+    background: #f9f9f9;
+    border-radius: 8px;
+    border-left: 4px solid #667eea;
+}
+
+.upload-tips h4 {
+    color: #333;
+    margin-bottom: 10px;
+}
+
+.upload-tips ul {
+    list-style: none;
+    padding: 0;
+}
+
+.upload-tips li {
+    color: #666;
+    margin-bottom: 8px;
+    font-size: 14px;
+    padding-left: 20px;
+    position: relative;
+}
+
+.upload-tips li:before {
+    content: "•";
+    color: #667eea;
+    position: absolute;
+    left: 0;
+}
+
+/* 消息提示 */
+.error-message,
+.success-message {
+    padding: 15px 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    animation: fadeIn 0.3s ease;
+}
+
+.error-message {
+    background: #ffeaea;
+    color: #d32f2f;
+    border: 1px solid #ffcdd2;
+}
+
+.success-message {
+    background: #e8f5e9;
+    color: #2e7d32;
+    border: 1px solid #c8e6c9;
+}
+
+/* 添加hash显示样式 */
+.file-hash {
+    font-size: 10px;
+    color: #666;
+    margin-top: 5px;
+    background: #f5f5f5;
+    padding: 2px 6px;
+    border-radius: 4px;
+    display: inline-block;
+    word-break: break-all;
+    font-family: monospace;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .upload-card {
+        padding: 20px;
+    }
+
+    .upload-title {
+        font-size: 24px;
+    }
+
+    .form-actions {
+        flex-direction: column;
+    }
+
+    .file-info {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .file-name {
+        max-width: 200px;
+    }
+}

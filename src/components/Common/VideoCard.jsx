@@ -7,15 +7,23 @@ const VideoCard = ({ video }) => {
         <div className="video-card">
             <Link to={`/video/${video.id}`} className="video-link">
                 <div className="video-thumbnail">
-                    <img src={video.thumbnail} alt={video.title} loading="lazy" />
-                    <div className="video-duration">{video.duration}</div>
+                    <img
+                        src={video.thumbnail || video.coverUrl || 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4'}
+                        alt={video.title}
+                        loading="lazy"
+                    />
+                    <div className="video-duration">{video.duration || '0:00'}</div>
                     <div className="video-overlay"></div>
                 </div>
 
                 <div className="video-content">
                     <div className="video-author">
-                        <img src={video.avatar} alt={video.author} className="author-avatar" />
-                        <span className="author-name">{video.author}</span>
+                        <img
+                            src={video.avatar || './default-avatar.png'}
+                            alt={video.author}
+                            className="author-avatar"
+                        />
+                        <span className="author-name">{video.author || '用户'}</span>
                     </div>
 
                     <h3 className="video-title">{video.title}</h3>
@@ -29,20 +37,20 @@ const VideoCard = ({ video }) => {
                     <div className="video-stats">
                         <div className="stat">
                             <FiEye />
-                            <span>{video.views}</span>
+                            <span>{video.views || 0}</span>
                         </div>
                         <div className="stat">
                             <FiHeart />
-                            <span>{video.likes}</span>
+                            <span>{video.likes || 0}</span>
                         </div>
                         <div className="stat">
                             <FiMessageCircle />
-                            <span>{video.comments}</span>
+                            <span>{video.comments || 0}</span>
                         </div>
                     </div>
 
                     <div className="video-meta">
-                        <span className="upload-time">{video.uploadTime}</span>
+                        <span className="upload-time">{video.uploadTime || '刚刚'}</span>
                     </div>
                 </div>
             </Link>
