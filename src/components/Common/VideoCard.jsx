@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { FiEye, FiHeart, FiMessageCircle, FiShare2 } from 'react-icons/fi';
+import { FiEye, FiHeart, FiMessageCircle } from 'react-icons/fi';
 import './VideoCard.css';
 
 const VideoCard = ({ video }) => {

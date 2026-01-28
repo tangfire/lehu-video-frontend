@@ -16,7 +16,6 @@ request.interceptors.request.use(
             config.headers.Authorization = `Bearer ${token}`;
         }
 
-        // 调试日志
         console.log('API请求:', {
             url: config.url,
             method: config.method,
@@ -33,7 +32,7 @@ request.interceptors.request.use(
     }
 );
 
-// 响应拦截器 - 适配统一响应格式
+// 响应拦截器
 request.interceptors.response.use(
     (response) => {
         const { data: responseData } = response;
@@ -44,12 +43,9 @@ request.interceptors.response.use(
             data: responseData
         });
 
-        // 你的响应格式: { code: 0, message: "success", data: {...}, timestamp: ... }
         if (responseData && responseData.code === 0) {
-            // 成功响应，返回data字段的内容
             return responseData.data;
         } else {
-            // 业务错误，返回reject
             const error = {
                 code: responseData.code || -1,
                 message: responseData.message || '请求失败',
@@ -61,7 +57,6 @@ request.interceptors.response.use(
         }
     },
     (error) => {
-        // HTTP错误（网络错误、超时、状态码错误等）
         console.error('HTTP错误:', {
             status: error.response?.status,
             data: error.response?.data,
@@ -70,7 +65,6 @@ request.interceptors.response.use(
         });
 
         if (error.response?.status === 401) {
-            // token过期，跳转到登录页
             console.log('Token过期，跳转到登录页');
             localStorage.removeItem('token');
             localStorage.removeItem('userInfo');
@@ -79,7 +73,6 @@ request.interceptors.response.use(
             }, 100);
         }
 
-        // 统一的错误处理
         const message = error.response?.data?.message || error.message || '请求失败';
         const rejectError = {
             code: error.response?.status || 500,

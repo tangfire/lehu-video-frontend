@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import VideoCard from '../../components/Common/VideoCard';
-import { FiTrendingUp, FiHeart, FiCompass, FiMapPin } from 'react-icons/fi';
+import { FiTrendingUp, FiHeart, FiMapPin } from 'react-icons/fi';
 import { IoSparkles } from 'react-icons/io5';
 import { videoApi } from '../../api/video';
 import { getCurrentUser } from '../../api/user';
@@ -15,7 +15,6 @@ const Home = () => {
     const [nextTime, setNextTime] = useState(Math.floor(Date.now() / 1000));
     const [error, setError] = useState(null);
 
-    // 获取视频流
     const fetchVideos = async (latestTime = nextTime, isLoadMore = false) => {
         try {
             setLoading(true);
@@ -23,22 +22,13 @@ const Home = () => {
 
             const user = getCurrentUser();
 
-            console.log('开始获取视频流:', {
-                latestTime,
-                userId: user?.id,
-                isLoadMore
-            });
-
             const response = await videoApi.feedShortVideo({
                 latest_time: latestTime,
                 user_id: user?.id || 0,
                 feed_num: 10
             });
 
-            console.log('视频流响应:', response);
-
             if (response && response.videos) {
-                // 格式化视频数据
                 const mappedVideos = response.videos.map(video => formatVideoData(video));
 
                 if (isLoadMore) {
@@ -47,7 +37,6 @@ const Home = () => {
                     setVideos(mappedVideos);
                 }
 
-                // 更新下一次请求的时间
                 if (response.next_time) {
                     setNextTime(Math.floor(response.next_time));
                 } else {
@@ -56,19 +45,12 @@ const Home = () => {
 
                 setHasMore(response.videos.length >= 10);
             } else {
-                console.warn('没有获取到视频数据');
                 setHasMore(false);
             }
         } catch (error) {
             console.error('获取视频失败:', error);
             setError(`获取视频失败: ${error.message || '未知错误'}`);
 
-            // 如果是int64类型错误，提示用户
-            if (error.message && error.message.includes('int64')) {
-                setError('数据格式错误，请确保时间戳为整数');
-            }
-
-            // 如果请求失败，可以尝试使用模拟数据
             if (!isLoadMore) {
                 loadMockData();
             }
@@ -77,9 +59,7 @@ const Home = () => {
         }
     };
 
-    // 加载模拟数据（备用）
     const loadMockData = () => {
-        console.log('加载模拟数据');
         const mockVideos = [
             {
                 id: 1,
@@ -115,7 +95,6 @@ const Home = () => {
         setHasMore(false);
     };
 
-    // 首次加载
     useEffect(() => {
         fetchVideos();
     }, []);
@@ -148,7 +127,6 @@ const Home = () => {
 
     return (
         <div className="home-container">
-            {/* 固定导航栏 */}
             <div className="sticky-nav">
                 <div className="home-tabs">
                     {tabs.map(tab => (
@@ -164,9 +142,7 @@ const Home = () => {
                 </div>
             </div>
 
-            {/* 主内容区域 */}
             <main className="home-content">
-                {/* 错误提示 */}
                 {error && (
                     <div className="error-banner">
                         <div className="error-content">
@@ -178,7 +154,6 @@ const Home = () => {
                     </div>
                 )}
 
-                {/* 欢迎横幅 */}
                 <div className="welcome-banner">
                     <div className="banner-content">
                         <h2>发现今日精彩</h2>
@@ -196,7 +171,6 @@ const Home = () => {
                     </div>
                 </div>
 
-                {/* 视频网格 */}
                 {videos.length > 0 ? (
                     <div className="video-feed">
                         {videos.map(video => (
@@ -214,7 +188,6 @@ const Home = () => {
                     </div>
                 )}
 
-                {/* 加载更多 */}
                 {hasMore && (
                     <div className="load-more">
                         <button

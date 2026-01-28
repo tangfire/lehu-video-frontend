@@ -1,0 +1,122 @@
+.follow-page {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.follow-page-header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.follow-page-header h1 {
+    margin: 0 0 10px 0;
+    font-size: 28px;
+    color: #333;
+    font-weight: 700;
+}
+
+.page-description {
+    margin: 0;
+    color: #666;
+    font-size: 14px;
+}
+
+.follow-tabs {
+    display: flex;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+    margin-bottom: 30px;
+}
+
+.follow-tab {
+    flex: 1;
+    padding: 18px;
+    background: none;
+    border: none;
+    font-size: 16px;
+    font-weight: 500;
+    color: #666;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.follow-tab:hover {
+    background: #f8f9fa;
+    color: #667eea;
+}
+
+.follow-tab.active {
+    color: #667eea;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+    font-weight: 600;
+}
+
+.follow-tab.active::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 20%;
+    right: 20%;
+    height: 3px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 3px;
+}
+
+.follow-content {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .follow-page {
+        padding: 15px;
+    }
+
+    .follow-page-header h1 {
+        font-size: 24px;
+    }
+
+    .follow-tabs {
+        border-radius: 8px;
+    }
+
+    .follow-tab {
+        padding: 15px;
+        font-size: 14px;
+    }
+}
+
+@media (max-width: 480px) {
+    .follow-page {
+        padding: 10px;
+    }
+
+    .follow-tabs {
+        flex-direction: column;
+    }
+
+    .follow-tab {
+        text-align: center;
+        border-bottom: 1px solid #f0f0f0;
+    }
+
+    .follow-tab:last-child {
+        border-bottom: none;
+    }
+
+    .follow-tab.active::after {
+        left: 0;
+        right: 0;
+        height: 2px;
+        bottom: -1px;
+    }
+}

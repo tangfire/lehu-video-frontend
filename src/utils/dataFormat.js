@@ -1,11 +1,9 @@
 /**
- * 视频数据格式化工具
+ * 数据格式化工具
  */
 
 /**
  * 确保int64字段是整数
- * @param {Object} data 请求数据
- * @returns {Object} 处理后的数据
  */
 export const ensureInt64Fields = (data) => {
     if (!data || typeof data !== 'object') return data;
@@ -18,7 +16,6 @@ export const ensureInt64Fields = (data) => {
 
     Object.keys(result).forEach(key => {
         if (int64Fields.includes(key)) {
-            // 如果是int64字段，确保是整数
             const value = result[key];
             if (value !== undefined && value !== null) {
                 if (typeof value === 'number') {
@@ -37,139 +34,110 @@ export const ensureInt64Fields = (data) => {
 };
 
 /**
- * 将后端视频数据转换为前端格式
- * @param {Object} videoData 后端返回的视频数据
- * @returns {Object} 前端格式的视频数据
+ * 格式化视频数据
  */
 export const formatVideoData = (videoData) => {
     if (!videoData) return null;
 
-    // 确保数字字段是整数
-    const safeVideoData = ensureInt64Fields(videoData);
-
     return {
-        id: safeVideoData.id || 0,
-        title: safeVideoData.title || '无标题',
-        author: safeVideoData.author?.name || '未知用户',
-        authorId: safeVideoData.author?.id || 0,
-        avatar: safeVideoData.author?.avatar || './default-avatar.png',
-        views: 0, // 需要额外接口获取
-        likes: safeVideoData.favoriteCount || 0,
-        comments: safeVideoData.commentCount || 0,
-        shares: 0,
-        thumbnail: safeVideoData.cover_url || 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80',
-        duration: '0:00',
-        uploadTime: '刚刚',
-        tags: [],
-        play_url: safeVideoData.play_url,
-        isFavorite: Boolean(safeVideoData.isFavorite),
-        isCollected: Boolean(safeVideoData.isCollected),
-        isFollowing: Boolean(safeVideoData.author?.isFollowing)
+        id: videoData.id || 0,
+        title: videoData.title || '无标题',
+        description: videoData.description || '',
+        author: videoData.author?.name || '用户',
+        authorId: videoData.author?.id || 0,
+        avatar: videoData.author?.avatar || '/default-avatar.png',
+        views: videoData.playCount || videoData.views || 0,
+        likes: videoData.favoriteCount || videoData.likes || 0,
+        dislikes: videoData.dislikeCount || videoData.dislikes || 0,
+        comments: videoData.commentCount || videoData.comments || 0,
+        shares: videoData.shareCount || videoData.shares || 0,
+        videoUrl: videoData.play_url || videoData.videoUrl || '',
+        thumbnail: videoData.cover_url || videoData.thumbnail || '',
+        uploadTime: formatRelativeTime(videoData.created_at || videoData.uploadTime),
+        tags: videoData.tags || [],
+        isFavorite: videoData.isFavorite || false,
+        isDisliked: videoData.isDisliked || false,
+        isFollowing: videoData.author?.isFollowing || false,
+        play_url: videoData.play_url || videoData.videoUrl || '',
+        collectedCount: videoData.collectedCount || 0,
+        isCollected: videoData.isCollected || false
     };
 };
 
 /**
- * 格式化时间戳为相对时间
- * @param {number|string} timestamp 时间戳（秒或毫秒）
- * @returns {string} 格式化后的时间
+ * 格式化评论数据
  */
-export const formatRelativeTime = (timestamp) => {
-    if (!timestamp) return '刚刚';
-
-    let timeInMs;
-    if (typeof timestamp === 'number') {
-        // 判断是秒还是毫秒
-        timeInMs = timestamp < 10000000000 ? timestamp * 1000 : timestamp;
-    } else if (typeof timestamp === 'string') {
-        timeInMs = new Date(timestamp).getTime();
-    } else {
-        return '刚刚';
-    }
-
-    const now = Date.now();
-    const diff = now - timeInMs;
-
-    if (diff < 60000) { // 1分钟内
-        return '刚刚';
-    } else if (diff < 3600000) { // 1小时内
-        const minutes = Math.floor(diff / 60000);
-        return `${minutes}分钟前`;
-    } else if (diff < 86400000) { // 1天内
-        const hours = Math.floor(diff / 3600000);
-        return `${hours}小时前`;
-    } else if (diff < 604800000) { // 1周内
-        const days = Math.floor(diff / 86400000);
-        return `${days}天前`;
-    } else {
-        const date = new Date(timeInMs);
-        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-    }
-};
-
-
-// 格式化评论数据（在原有的基础上添加）
 export const formatCommentData = (commentData) => {
     if (!commentData) return null;
 
-    const processedData = ensureInt64Fields(commentData);
-
     return {
-        id: processedData.id || 0,
-        videoId: processedData.video_id || 0,
-        parentId: processedData.parent_id || 0,
-        content: processedData.content || '',
-        date: processedData.date || '',
-        likeCount: processedData.like_count || 0,
-        replyCount: processedData.reply_count || 0,
-        isLiked: Boolean(processedData.is_liked),
-
-        // 用户信息
-        user: processedData.user ? {
-            id: processedData.user.id || 0,
-            name: processedData.user.name || '用户',
-            avatar: processedData.user.avatar || './default-avatar.png',
-            isFollowing: Boolean(processedData.user.is_following)
+        id: commentData.id || 0,
+        content: commentData.content || '',
+        user: {
+            id: commentData.user?.id || 0,
+            name: commentData.user?.name || '用户',
+            avatar: commentData.user?.avatar || '/default-avatar.png'
+        },
+        replyUser: commentData.replyUser ? {
+            id: commentData.replyUser.id || 0,
+            name: commentData.replyUser.name || '用户'
         } : null,
-
-        // 回复用户信息
-        replyUser: processedData.reply_user ? {
-            id: processedData.reply_user.id || 0,
-            name: processedData.reply_user.name || '用户',
-            avatar: processedData.reply_user.avatar || './default-avatar.png',
-            isFollowing: Boolean(processedData.reply_user.is_following)
-        } : null,
-
-        // 子评论
-        comments: (processedData.comments || []).map(childComment =>
-            formatCommentData(childComment)
-        )
+        likeCount: commentData.likeCount || 0,
+        dislikeCount: commentData.dislikeCount || 0,
+        isLiked: commentData.isLiked || false,
+        isDisliked: commentData.isDisliked || false,
+        date: formatRelativeTime(commentData.created_at || commentData.date),
+        comments: commentData.comments ? commentData.comments.map(formatCommentData) : [],
+        replyCount: commentData.replyCount || 0
     };
 };
 
-// 格式化相对时间（评论专用）
-export const formatCommentTime = (dateString) => {
-    if (!dateString) return '刚刚';
+/**
+ * 格式化相对时间
+ */
+export const formatRelativeTime = (date) => {
+    if (!date) return '刚刚';
 
-    try {
-        const date = new Date(dateString);
-        const now = new Date();
-        const diffInSeconds = Math.floor((now - date) / 1000);
+    const now = new Date();
+    const targetDate = new Date(date);
+    const diffInSeconds = Math.floor((now - targetDate) / 1000);
 
-        if (diffInSeconds < 60) {
-            return `${diffInSeconds}秒前`;
-        } else if (diffInSeconds < 3600) {
-            const minutes = Math.floor(diffInSeconds / 60);
-            return `${minutes}分钟前`;
-        } else if (diffInSeconds < 86400) {
-            const hours = Math.floor(diffInSeconds / 3600);
-            return `${hours}小时前`;
-        } else if (diffInSeconds < 604800) {
-            const days = Math.floor(diffInSeconds / 86400);
-            return `${days}天前`;
+    if (diffInSeconds < 60) return '刚刚';
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}分钟前`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}小时前`;
+    if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 86400)}天前`;
+    if (diffInSeconds < 31536000) return `${Math.floor(diffInSeconds / 2592000)}个月前`;
+    return `${Math.floor(diffInSeconds / 31536000)}年前`;
+};
+
+/**
+ * 构建评论树
+ */
+export const buildCommentTree = (comments) => {
+    if (!Array.isArray(comments)) return [];
+
+    const commentMap = new Map();
+    const rootComments = [];
+
+    comments.forEach(comment => {
+        commentMap.set(comment.id, {
+            ...comment,
+            children: []
+        });
+    });
+
+    commentMap.forEach(comment => {
+        if (comment.parentId === 0) {
+            rootComments.push(comment);
         } else {
-            return date.toLocaleDateString();
+            const parent = commentMap.get(comment.parentId);
+            if (parent) {
+                parent.children.push(comment);
+                parent.children.sort((a, b) => new Date(a.date) - new Date(b.date));
+            }
         }
-    } catch (error) {
-        return dateString;
-    }
+    });
+
+    rootComments.sort((a, b) => new Date(b.date) - new Date(a.date));
+    return rootComments;
 };

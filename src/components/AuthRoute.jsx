@@ -10,7 +10,6 @@ const AuthRoute = ({ children }) => {
     });
 
     if (!isLoggedIn()) {
-        // 未登录，重定向到登录页
         return <Navigate to="/login" state={{ from: location }} replace />;
     }
 

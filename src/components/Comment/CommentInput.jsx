@@ -42,15 +42,10 @@ const CommentInput = ({
             });
 
             if (response && response.comment) {
-                // 清空输入框
                 setContent('');
-
-                // 通知父组件
                 if (onCommentSubmit) {
                     onCommentSubmit(response.comment);
                 }
-
-                // 如果是回复，关闭回复框
                 if (onCancel) {
                     onCancel();
                 }
@@ -69,7 +64,6 @@ const CommentInput = ({
     };
 
     const handleKeyDown = (e) => {
-        // Ctrl + Enter 提交
         if (e.ctrlKey && e.key === 'Enter') {
             handleSubmit(e);
         }
@@ -91,7 +85,6 @@ const CommentInput = ({
 
     return (
         <form onSubmit={handleSubmit} className="comment-input-form">
-            {/* 用户头像和基本信息 */}
             <div className="comment-user-info">
                 <img
                     src={currentUser.avatar || DEFAULT_AVATAR}
@@ -102,7 +95,6 @@ const CommentInput = ({
                 <span className="user-name">{currentUser.name}</span>
             </div>
 
-            {/* 回复提示 */}
             {replyTo && (
                 <div className="reply-hint">
                     回复 <span className="reply-username">@{replyTo.name}</span>
@@ -116,7 +108,6 @@ const CommentInput = ({
                 </div>
             )}
 
-            {/* 文本输入框 */}
             <div className="input-wrapper">
                 <textarea
                     value={content}
@@ -129,7 +120,6 @@ const CommentInput = ({
                     disabled={loading}
                 />
 
-                {/* 字数统计 */}
                 <div className="textarea-footer">
                     <span className={`char-count ${content.length >= 450 ? 'warning' : ''} ${content.length >= 490 ? 'error' : ''}`}>
                         {content.length}/500
@@ -137,14 +127,12 @@ const CommentInput = ({
                 </div>
             </div>
 
-            {/* 错误提示 */}
             {error && (
                 <div className="input-error">
                     {error}
                 </div>
             )}
 
-            {/* 操作按钮 */}
             <div className="input-actions">
                 {onCancel && (
                     <button

@@ -1,7 +1,7 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { getCurrentUser, clearUserData, getUserDisplayName } from '../../api/user';
-import { FiSearch, FiUpload, FiHome, FiUser, FiSettings, FiLogOut, FiMessageCircle, FiBell, FiMenu, FiX } from 'react-icons/fi';
+import { FiSearch, FiUpload, FiHome, FiUser, FiSettings, FiLogOut, FiMessageCircle, FiBell, FiMenu, FiX, FiUsers } from 'react-icons/fi';
 import { IoSparkles } from 'react-icons/io5';
 import './Header.css';
 
@@ -15,6 +15,9 @@ const Header = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const navigate = useNavigate();
     const location = useLocation();
+
+    // 使用 ref 来存储 dropdown 元素
+    const dropdownRef = useRef(null);
 
     // 检查登录状态
     useEffect(() => {
@@ -32,19 +35,8 @@ const Header = () => {
         };
 
         checkAuth();
-
-        // 监听storage变化
-        const handleStorageChange = (e) => {
-            if (e.key === 'token' || e.key === 'userInfo') {
-                checkAuth();
-            }
-        };
-
-        window.addEventListener('storage', handleStorageChange);
-
-        return () => {
-            window.removeEventListener('storage', handleStorageChange);
-        };
+        window.addEventListener('storage', checkAuth);
+        return () => window.removeEventListener('storage', checkAuth);
     }, []);
 
     const handleLogout = () => {
@@ -62,12 +54,14 @@ const Header = () => {
         }
     };
 
-    const toggleDropdown = () => {
-        setShowDropdown(!showDropdown);
-    };
-
+    // 定义 closeDropdown 函数
     const closeDropdown = () => {
         setShowDropdown(false);
+    };
+
+    // 定义 toggleDropdown 函数
+    const toggleDropdown = () => {
+        setShowDropdown(!showDropdown);
     };
 
     const handleImageError = (e) => {
@@ -78,7 +72,7 @@ const Header = () => {
     // 点击外部关闭下拉菜单
     useEffect(() => {
         const handleClickOutside = (event) => {
-            if (!event.target.closest('.user-menu')) {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
                 setShowDropdown(false);
             }
         };
@@ -152,7 +146,7 @@ const Header = () => {
                                 <span className="notification-badge">3</span>
                             </button>
 
-                            <div className="user-menu">
+                            <div className="user-menu" ref={dropdownRef}>
                                 <button
                                     className="user-avatar-btn"
                                     onClick={toggleDropdown}
@@ -189,16 +183,34 @@ const Header = () => {
                                         <Link
                                             to={`/user/${userInfo?.id}`}
                                             className="dropdown-item"
-                                            onClick={closeDropdown}
+                                            onClick={() => {
+                                                closeDropdown();
+                                                setShowMobileMenu(false);
+                                            }}
                                         >
                                             <FiUser />
                                             <span>个人中心</span>
                                         </Link>
 
                                         <Link
+                                            to={`/user/${userInfo?.id}/follow`}
+                                            className="dropdown-item"
+                                            onClick={() => {
+                                                closeDropdown();
+                                                setShowMobileMenu(false);
+                                            }}
+                                        >
+                                            <FiUsers />
+                                            <span>我的关注</span>
+                                        </Link>
+
+                                        <Link
                                             to="/settings"
                                             className="dropdown-item"
-                                            onClick={closeDropdown}
+                                            onClick={() => {
+                                                closeDropdown();
+                                                setShowMobileMenu(false);
+                                            }}
                                         >
                                             <FiSettings />
                                             <span>账号设置</span>
@@ -208,7 +220,10 @@ const Header = () => {
 
                                         <button
                                             className="dropdown-item logout-btn"
-                                            onClick={handleLogout}
+                                            onClick={() => {
+                                                closeDropdown();
+                                                handleLogout();
+                                            }}
                                         >
                                             <FiLogOut />
                                             <span>退出登录</span>
@@ -219,10 +234,10 @@ const Header = () => {
                         </>
                     ) : (
                         <div className="auth-buttons">
-                            <Link to="/login" className="login-btn">
+                            <Link to="/login" className="login-btn" onClick={() => setShowMobileMenu(false)}>
                                 登录
                             </Link>
-                            <Link to="/register" className="register-btn">
+                            <Link to="/register" className="register-btn" onClick={() => setShowMobileMenu(false)}>
                                 注册
                             </Link>
                         </div>

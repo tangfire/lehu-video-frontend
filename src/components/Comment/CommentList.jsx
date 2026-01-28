@@ -1,6 +1,8 @@
-import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
+import React, { useState, useEffect, forwardRef, useImperativeHandle, useCallback } from 'react';
 import { getCurrentUser } from '../../api/user';
 import { commentApi, formatCommentData, buildCommentTree } from '../../api/comment';
+import { favoriteApi } from '../../api/favorite';
+import { debounce } from '../../utils/favoriteHelper';
 import CommentItem from './CommentItem';
 import './CommentList.css';
 
@@ -16,6 +18,7 @@ const CommentList = forwardRef(({
     const [replyContent, setReplyContent] = useState('');
     const [replyToComment, setReplyToComment] = useState(null);
     const [error, setError] = useState(null);
+    const [totalCount, setTotalCount] = useState(0);
 
     const currentUser = getCurrentUser();
 
@@ -30,15 +33,35 @@ const CommentList = forwardRef(({
             setLoading(true);
             setError(null);
 
+            console.log('加载评论，视频ID:', videoId, '页码:', pageNum);
+
             const response = await commentApi.getVideoComments({
                 videoId,
                 page: pageNum,
                 pageSize: 20
             });
 
-            if (response && Array.isArray(response.comments)) {
-                const formattedComments = response.comments.map(formatCommentData);
+            console.log('评论API响应:', response);
+
+            if (response) {
+                let commentList = [];
+
+                // 处理不同的响应格式
+                if (Array.isArray(response)) {
+                    commentList = response;
+                } else if (response.comments && Array.isArray(response.comments)) {
+                    commentList = response.comments;
+                } else if (response.list && Array.isArray(response.list)) {
+                    commentList = response.list;
+                }
+
+                // 格式化评论数据
+                const formattedComments = commentList.map(formatCommentData);
+                console.log('格式化后的评论:', formattedComments);
+
+                // 构建评论树
                 const commentTree = buildCommentTree(formattedComments);
+                console.log('构建的评论树:', commentTree);
 
                 if (pageNum === 1) {
                     setComments(commentTree);
@@ -46,11 +69,13 @@ const CommentList = forwardRef(({
                     setComments(prev => [...prev, ...commentTree]);
                 }
 
-                // 检查是否还有更多评论
-                const total = response.page_stats?.total || 0;
+                // 更新分页信息
+                const total = response.total || response.count || commentList.length;
                 const loadedCount = pageNum * 20;
-                setHasMore(loadedCount < total);
+                setTotalCount(total);
+                setHasMore(commentTree.length >= 20 || loadedCount < total);
             } else {
+                console.warn('没有获取到评论数据');
                 setComments([]);
                 setHasMore(false);
             }
@@ -58,13 +83,77 @@ const CommentList = forwardRef(({
             setPage(pageNum);
         } catch (error) {
             console.error('加载评论失败:', error);
-            setError('加载评论失败，请稍后重试');
+            setError(`加载评论失败: ${error.message || '未知错误'}`);
+
+            // 加载模拟数据作为备选
+            if (pageNum === 1) {
+                loadMockComments();
+            }
         } finally {
             setLoading(false);
         }
     };
 
-    // 暴露方法给父组件
+    const loadMockComments = () => {
+        console.log('加载模拟评论数据');
+        const mockComments = [
+            {
+                id: 1,
+                content: '这个视频真不错，学到了很多！',
+                date: '2小时前',
+                likeCount: 45,
+                dislikeCount: 2,
+                isLiked: false,
+                isDisliked: false,
+                user: {
+                    id: 101,
+                    name: '用户A',
+                    avatar: '/default-avatar.png'
+                },
+                comments: [
+                    {
+                        id: 11,
+                        content: '我也这么觉得！',
+                        date: '1小时前',
+                        likeCount: 12,
+                        dislikeCount: 0,
+                        isLiked: false,
+                        isDisliked: false,
+                        user: {
+                            id: 102,
+                            name: '用户B',
+                            avatar: '/default-avatar.png'
+                        },
+                        replyUser: {
+                            id: 101,
+                            name: '用户A'
+                        },
+                        comments: []
+                    }
+                ]
+            },
+            {
+                id: 2,
+                content: '感谢分享，期待更多内容！',
+                date: '3小时前',
+                likeCount: 23,
+                dislikeCount: 1,
+                isLiked: true,
+                isDisliked: false,
+                user: {
+                    id: 103,
+                    name: '用户C',
+                    avatar: '/default-avatar.png'
+                },
+                comments: []
+            }
+        ];
+
+        setComments(mockComments);
+        setTotalCount(mockComments.length);
+        setHasMore(false);
+    };
+
     useImperativeHandle(ref, () => ({
         reload: () => {
             loadComments();
@@ -72,6 +161,7 @@ const CommentList = forwardRef(({
         addComment: (newComment) => {
             const formattedComment = formatCommentData(newComment);
             setComments(prev => [formattedComment, ...prev]);
+            setTotalCount(prev => prev + 1);
         }
     }));
 
@@ -81,63 +171,14 @@ const CommentList = forwardRef(({
         }
     };
 
-    const handleSubmitComment = async (content, parentId = 0, replyUserId = 0) => {
-        if (!content.trim() || !currentUser) return;
-
-        try {
-            const response = await commentApi.createComment({
-                videoId,
-                content,
-                parentId,
-                replyUserId
-            });
-
-            if (response && response.comment) {
-                const newComment = formatCommentData(response.comment);
-
-                if (parentId === 0) {
-                    // 根评论
-                    setComments(prev => [newComment, ...prev]);
-                } else {
-                    // 子评论，需要更新对应父评论
-                    setComments(prev =>
-                        prev.map(comment => {
-                            if (comment.id === parentId) {
-                                const updatedComments = [...(comment.comments || []), newComment];
-                                return {
-                                    ...comment,
-                                    comments: updatedComments,
-                                    replyCount: updatedComments.length
-                                };
-                            }
-                            return comment;
-                        })
-                    );
-                }
-
-                // 重置状态
-                setReplyContent('');
-                setReplyToComment(null);
-                setShowReplyInput(null);
-
-                return true; // 返回成功状态
-            }
-        } catch (error) {
-            console.error('发表评论失败:', error);
-            setError('发表评论失败，请稍后重试');
-            return false;
-        }
-    };
-
     const handleReply = (commentId, user) => {
         setShowReplyInput(commentId);
         setReplyToComment({ commentId, user });
         setReplyContent(`@${user?.name || '用户'} `);
     };
 
-    // 处理回复提交
     const handleReplySubmit = async (commentId, content) => {
-        if (!content.trim()) return false;
+        if (!content.trim() || !currentUser) return false;
 
         try {
             const response = await commentApi.createComment({
@@ -147,25 +188,21 @@ const CommentList = forwardRef(({
                 replyUserId: replyToComment?.user?.id || 0
             });
 
-            if (response && response.comment) {
-                const newReply = formatCommentData(response.comment);
+            if (response) {
+                const newReply = formatCommentData(response);
 
-                // 更新评论列表
                 setComments(prev =>
                     prev.map(comment => {
                         if (comment.id === commentId) {
-                            const updatedReplies = [...(comment.comments || []), newReply];
                             return {
                                 ...comment,
-                                comments: updatedReplies,
-                                replyCount: updatedReplies.length
+                                comments: [...(comment.comments || []), newReply]
                             };
                         }
                         return comment;
                     })
                 );
 
-                // 关闭回复输入框
                 setShowReplyInput(null);
                 setReplyContent('');
                 setReplyToComment(null);
@@ -174,33 +211,96 @@ const CommentList = forwardRef(({
             }
         } catch (error) {
             console.error('回复评论失败:', error);
-            setError('回复评论失败，请稍后重试');
+            setError(`回复评论失败: ${error.message || '未知错误'}`);
             return false;
         }
     };
 
-    const handleLike = async (commentId, isLiked) => {
-        try {
-            // TODO: 调用点赞/取消点赞接口
-            // const response = isLiked
-            //     ? await commentApi.likeComment(commentId)
-            //     : await commentApi.unlikeComment(commentId);
+    // 使用防抖处理点赞
+    const debouncedLike = useCallback(
+        debounce(async (commentId, isLiked) => {
+            if (!currentUser) {
+                alert('请先登录后才能点赞评论');
+                return;
+            }
 
-            // 本地更新
-            setComments(prev =>
-                prev.map(comment => updateCommentLikes(comment, commentId, isLiked))
-            );
-        } catch (error) {
-            console.error('点赞失败:', error);
-        }
-    };
+            try {
+                let response;
+                if (isLiked) {
+                    response = await favoriteApi.unlikeComment(commentId);
+                } else {
+                    response = await favoriteApi.likeComment(commentId);
+                }
 
-    const updateCommentLikes = (comment, targetId, isLiked) => {
+                if (response) {
+                    setComments(prev =>
+                        prev.map(comment =>
+                            updateCommentState(comment, commentId, {
+                                isLiked: !isLiked,
+                                isDisliked: false,
+                                likeCount: isLiked
+                                    ? Math.max(0, (comment.likeCount || 0) - 1)
+                                    : (comment.likeCount || 0) + 1,
+                                dislikeCount: comment.isDisliked
+                                    ? Math.max(0, (comment.dislikeCount || 0) - 1)
+                                    : comment.dislikeCount
+                            })
+                        )
+                    );
+                }
+            } catch (error) {
+                console.error('评论点赞操作失败:', error);
+                alert('操作失败，请稍后重试');
+            }
+        }, 300),
+        [currentUser]
+    );
+
+    // 使用防抖处理点踩
+    const debouncedDislike = useCallback(
+        debounce(async (commentId, isDisliked) => {
+            if (!currentUser) {
+                alert('请先登录后才能点踩评论');
+                return;
+            }
+
+            try {
+                let response;
+                if (isDisliked) {
+                    response = await favoriteApi.undislikeComment(commentId);
+                } else {
+                    response = await favoriteApi.dislikeComment(commentId);
+                }
+
+                if (response) {
+                    setComments(prev =>
+                        prev.map(comment =>
+                            updateCommentState(comment, commentId, {
+                                isLiked: false,
+                                isDisliked: !isDisliked,
+                                likeCount: comment.isLiked
+                                    ? Math.max(0, (comment.likeCount || 0) - 1)
+                                    : comment.likeCount,
+                                dislikeCount: isDisliked
+                                    ? Math.max(0, (comment.dislikeCount || 0) - 1)
+                                    : (comment.dislikeCount || 0) + 1
+                            })
+                        )
+                    );
+                }
+            } catch (error) {
+                console.error('评论点踩操作失败:', error);
+                alert('操作失败，请稍后重试');
+            }
+        }, 300),
+        [currentUser]
+    );
+
+    const updateCommentState = (comment, targetId, newState) => {
         if (comment.id === targetId) {
             return {
                 ...comment,
-                likeCount: isLiked ? (comment.likeCount || 0) + 1 : Math.max((comment.likeCount || 0) - 1, 0),
-                isLiked
+                ...newState
             };
         }
 
@@ -208,7 +308,7 @@ const CommentList = forwardRef(({
             return {
                 ...comment,
                 comments: comment.comments.map(child =>
-                    updateCommentLikes(child, targetId, isLiked)
+                    updateCommentState(child, targetId, newState)
                 )
             };
         }
@@ -217,11 +317,12 @@ const CommentList = forwardRef(({
     };
 
     const handleDelete = async (commentId) => {
+        if (!window.confirm('确定要删除这条评论吗？')) return;
+
         try {
             await commentApi.deleteComment(commentId);
-
-            // 从评论列表中移除
             setComments(prev => removeComment(prev, commentId));
+            setTotalCount(prev => prev - 1);
         } catch (error) {
             console.error('删除评论失败:', error);
             setError('删除评论失败，请稍后重试');
@@ -240,36 +341,6 @@ const CommentList = forwardRef(({
         });
     };
 
-    const handleLoadChildComments = async (commentId) => {
-        try {
-            const response = await commentApi.getChildComments({
-                commentId,
-                page: 1,
-                pageSize: 10
-            });
-
-            if (response && Array.isArray(response.comments)) {
-                const formattedComments = response.comments.map(formatCommentData);
-
-                // 更新对应评论的子评论
-                setComments(prev =>
-                    prev.map(comment => {
-                        if (comment.id === commentId) {
-                            return {
-                                ...comment,
-                                comments: formattedComments,
-                                replyCount: formattedComments.length
-                            };
-                        }
-                        return comment;
-                    })
-                );
-            }
-        } catch (error) {
-            console.error('加载子评论失败:', error);
-        }
-    };
-
     if (error) {
         return (
             <div className="comment-error">
@@ -283,21 +354,25 @@ const CommentList = forwardRef(({
 
     return (
         <div className="comment-list">
-            {/* 评论统计 */}
             <div className="comment-header">
-                <h3>评论 ({comments.length})</h3>
+                <h3>评论 ({totalCount || comments.length})</h3>
             </div>
 
-            {/* 评论列表 */}
             <div className="comments-container">
-                {comments.length > 0 ? (
+                {loading && comments.length === 0 ? (
+                    <div className="comment-loading">
+                        <div className="loading-spinner"></div>
+                        <p>加载评论中...</p>
+                    </div>
+                ) : comments.length > 0 ? (
                     <>
                         {comments.map(comment => (
                             <CommentItem
                                 key={comment.id}
                                 comment={comment}
                                 currentUserId={currentUser?.id}
-                                onLike={handleLike}
+                                onLike={debouncedLike}
+                                onDislike={debouncedDislike}
                                 onReply={handleReply}
                                 onDelete={handleDelete}
                                 onReplySubmit={handleReplySubmit}
@@ -309,7 +384,6 @@ const CommentList = forwardRef(({
                             />
                         ))}
 
-                        {/* 加载更多 */}
                         {hasMore && (
                             <div className="load-more-comments">
                                 <button

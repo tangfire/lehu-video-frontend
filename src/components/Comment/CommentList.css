@@ -1,3 +1,4 @@
+/* src/components/Comment/CommentList.css */
 .comment-list {
     margin-top: 30px;
 }
@@ -20,7 +21,6 @@
     padding-right: 10px;
 }
 
-/* 自定义滚动条 */
 .comments-container::-webkit-scrollbar {
     width: 6px;
 }
@@ -37,6 +37,35 @@
 
 .comments-container::-webkit-scrollbar-thumb:hover {
     background: #999;
+}
+
+/* 评论加载状态 */
+.comment-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 0;
+}
+
+.comment-loading .loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #667eea;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 15px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.comment-loading p {
+    color: #666;
+    font-size: 14px;
 }
 
 .load-more-comments {
@@ -69,7 +98,7 @@
 
 .no-comments {
     text-align: center;
-    padding: 40px 20px;
+    padding: 60px 20px;
     color: #999;
 }
 
@@ -79,12 +108,18 @@
     opacity: 0.5;
 }
 
+.no-comments p {
+    font-size: 16px;
+    margin: 0;
+}
+
 .comment-error {
     text-align: center;
     padding: 20px;
     background: #ffeaea;
     border-radius: 8px;
     color: #d32f2f;
+    margin: 20px 0;
 }
 
 .comment-error p {

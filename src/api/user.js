@@ -65,21 +65,6 @@ export const getVoucherTypeText = (type) => {
 };
 
 
-
-// 清除用户信息
-export const clearUserData = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('userInfo');
-};
-
-
-
-// 检查登录状态
-export const isLoggedIn = () => {
-    const token = localStorage.getItem('token');
-    return !!token && token.length > 0;
-};
-
 // 更新本地存储的用户信息
 export const updateLocalUserInfo = (newUserInfo) => {
     const currentUser = getCurrentUser();
@@ -96,30 +81,7 @@ export const updateLocalUserInfo = (newUserInfo) => {
     return null;
 };
 
-// 获取用户显示名称
-export const getUserDisplayName = (user) => {
-    if (!user) return '用户';
 
-    if (user.name && user.name.trim()) {
-        return user.name;
-    }
-
-    if (user.mobile) {
-        // 确保 mobile 是字符串
-        const mobileStr = String(user.mobile);
-        return mobileStr.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2');
-    }
-
-    if (user.email && user.email !== '') {
-        const [username, domain] = user.email.split('@');
-        if (username && username.length > 3) {
-            return `${username.substring(0, 3)}***@${domain}`;
-        }
-        return `***@${domain}`;
-    }
-
-    return `用户${user.id ? user.id.toString().slice(-4) : ''}`;
-};
 
 // 存储用户信息时也修复 mobile 字段
 export const saveUserData = (token, userInfo) => {
@@ -145,30 +107,34 @@ export const saveUserData = (token, userInfo) => {
     return userData;
 };
 
-// 获取当前用户信息时也修复
-export const getCurrentUser = () => {
-    const userStr = localStorage.getItem('userInfo');
-    if (!userStr) return null;
 
+
+/**
+ * 用户相关API
+ */
+
+export const getCurrentUser = () => {
     try {
-        const user = JSON.parse(userStr);
-        // 确保返回标准化的用户信息，mobile为字符串
-        return {
-            id: user.id || 0,
-            name: user.name || '',
-            avatar: user.avatar || '',
-            background_image: user.background_image || '',
-            signature: user.signature || '',
-            mobile: String(user.mobile || ''), // 转为字符串
-            email: user.email || '',
-            follow_count: user.follow_count || 0,
-            follower_count: user.follower_count || 0,
-            total_favorited: user.total_favorited || 0,
-            work_count: user.work_count || 0,
-            favorite_count: user.favorite_count || 0
-        };
+        const userInfo = localStorage.getItem('userInfo');
+        return userInfo ? JSON.parse(userInfo) : null;
     } catch (error) {
-        console.error('解析用户信息失败:', error);
+        console.error('获取用户信息失败:', error);
         return null;
     }
+};
+
+export const getUserDisplayName = (user) => {
+    if (!user) return '用户';
+    return user.name || user.username || '用户';
+};
+
+export const isLoggedIn = () => {
+    const token = localStorage.getItem('token');
+    const user = getCurrentUser();
+    return !!(token && user);
+};
+
+export const clearUserData = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('userInfo');
 };

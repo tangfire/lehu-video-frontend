@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FiHeart, FiMessageCircle, FiMoreVertical } from 'react-icons/fi';
+import { FaThumbsDown } from 'react-icons/fa';
 import './CommentItem.css';
 
 const DEFAULT_AVATAR = '/default-avatar.png';
@@ -9,6 +10,7 @@ const CommentItem = ({
                          comment,
                          currentUserId,
                          onLike,
+                         onDislike,
                          onReply,
                          onDelete,
                          onReplySubmit,
@@ -22,12 +24,44 @@ const CommentItem = ({
     const [showActions, setShowActions] = useState(false);
     const [localReplyContent, setLocalReplyContent] = useState('');
     const [isSubmittingReply, setIsSubmittingReply] = useState(false);
+    const [isLiking, setIsLiking] = useState(false);
+    const [isDisliking, setIsDisliking] = useState(false);
 
     const isCurrentUser = currentUserId === comment.user?.id;
 
-    const handleLike = () => {
-        if (onLike) {
-            onLike(comment.id, !comment.isLiked);
+    const handleLike = async () => {
+        if (!currentUserId) {
+            alert('请先登录后才能点赞评论');
+            return;
+        }
+
+        if (isLiking) return;
+
+        setIsLiking(true);
+        try {
+            await onLike(comment.id, comment.isLiked);
+        } catch (error) {
+            console.error('点赞操作失败:', error);
+        } finally {
+            setIsLiking(false);
+        }
+    };
+
+    const handleDislike = async () => {
+        if (!currentUserId) {
+            alert('请先登录后才能点踩评论');
+            return;
+        }
+
+        if (isDisliking) return;
+
+        setIsDisliking(true);
+        try {
+            await onDislike(comment.id, comment.isDisliked);
+        } catch (error) {
+            console.error('点踩操作失败:', error);
+        } finally {
+            setIsDisliking(false);
         }
     };
 
@@ -47,9 +81,9 @@ const CommentItem = ({
     const handleImageError = (e) => {
         e.target.onerror = null;
         e.target.src = DEFAULT_AVATAR;
+        console.warn('头像加载失败，使用默认头像');
     };
 
-    // 处理回复提交
     const handleSubmitReply = async () => {
         if (!onReplySubmit) return;
 
@@ -74,14 +108,12 @@ const CommentItem = ({
         }
     };
 
-    // 取消回复
     const handleCancelReply = () => {
         setLocalReplyContent('');
         if (setReplyContent) setReplyContent('');
         if (onToggleReply) onToggleReply(null);
     };
 
-    // 处理输入框变化
     const handleReplyInputChange = (e) => {
         const value = e.target.value;
         setLocalReplyContent(value);
@@ -90,12 +122,10 @@ const CommentItem = ({
         }
     };
 
-    // 检查是否正在回复此评论
     const isReplyingThisComment = showReplyInput === comment.id;
 
     return (
         <div className={`comment-item ${depth > 0 ? 'child-comment' : ''}`}>
-            {/* 评论内容 */}
             <div className="comment-content">
                 <Link
                     to={`/user/${comment.user?.id}`}
@@ -144,9 +174,21 @@ const CommentItem = ({
                         <button
                             className={`comment-action-btn like-btn ${comment.isLiked ? 'liked' : ''}`}
                             onClick={handleLike}
+                            disabled={isLiking}
                         >
                             <FiHeart />
                             <span>{comment.likeCount || 0}</span>
+                            {isLiking && <span className="action-loading"></span>}
+                        </button>
+
+                        <button
+                            className={`comment-action-btn dislike-btn ${comment.isDisliked ? 'disliked' : ''}`}
+                            onClick={handleDislike}
+                            disabled={isDisliking}
+                        >
+                            <FaThumbsDown />
+                            <span>{comment.dislikeCount || 0}</span>
+                            {isDisliking && <span className="action-loading"></span>}
                         </button>
 
                         <button
@@ -177,10 +219,7 @@ const CommentItem = ({
                                     )}
                                     <button
                                         className="report-btn"
-                                        onClick={() => {
-                                            // 举报功能
-                                            setShowActions(false);
-                                        }}
+                                        onClick={() => setShowActions(false)}
                                     >
                                         举报
                                     </button>
@@ -189,7 +228,6 @@ const CommentItem = ({
                         </div>
                     </div>
 
-                    {/* 回复输入框 */}
                     {isReplyingThisComment && (
                         <div className="reply-input-wrapper">
                             <textarea
@@ -220,7 +258,6 @@ const CommentItem = ({
                         </div>
                     )}
 
-                    {/* 子评论列表 */}
                     {comment.comments && comment.comments.length > 0 && (
                         <div className="child-comments">
                             {comment.comments.map(childComment => (
@@ -229,6 +266,7 @@ const CommentItem = ({
                                     comment={childComment}
                                     currentUserId={currentUserId}
                                     onLike={onLike}
+                                    onDislike={onDislike}
                                     onReply={onReply}
                                     onDelete={onDelete}
                                     onReplySubmit={onReplySubmit}

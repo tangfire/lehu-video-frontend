@@ -4,8 +4,6 @@ import './Layout.css';
 
 const MainLayout = () => {
     const location = useLocation();
-
-    // 排除不需要Header的页面
     const hideHeader = ['/login', '/register'].includes(location.pathname);
 
     return (
@@ -60,7 +58,7 @@ const MainLayout = () => {
 
                         <div className="footer-bottom">
                             <p className="copyright">
-                                © 2024 ShortVideo. All rights reserved.
+                                © {new Date().getFullYear()} ShortVideo. All rights reserved.
                             </p>
                             <div className="footer-meta">
                                 <a href="#">使用条款</a>
