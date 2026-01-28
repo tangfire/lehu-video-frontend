@@ -5,6 +5,8 @@ import { FiSearch, FiUpload, FiHome, FiUser, FiSettings, FiLogOut, FiMessageCirc
 import { IoSparkles } from 'react-icons/io5';
 import './Header.css';
 
+const DEFAULT_AVATAR = '/default-avatar.png';
+
 const Header = () => {
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [userInfo, setUserInfo] = useState(null);
@@ -66,6 +68,11 @@ const Header = () => {
 
     const closeDropdown = () => {
         setShowDropdown(false);
+    };
+
+    const handleImageError = (e) => {
+        e.target.onerror = null;
+        e.target.src = DEFAULT_AVATAR;
     };
 
     // 点击外部关闭下拉菜单
@@ -151,13 +158,10 @@ const Header = () => {
                                     onClick={toggleDropdown}
                                 >
                                     <img
-                                        src={userInfo?.avatar || './default-avatar.png'}
+                                        src={userInfo?.avatar || DEFAULT_AVATAR}
                                         alt="用户头像"
                                         className="avatar-img"
-                                        onError={(e) => {
-                                            e.target.onerror = null;
-                                            e.target.src = './default-avatar.png';
-                                        }}
+                                        onError={handleImageError}
                                     />
                                     <span className="user-name">
                                         {getUserDisplayName(userInfo) || '用户'}
@@ -169,9 +173,10 @@ const Header = () => {
                                     <div className="dropdown-menu">
                                         <div className="dropdown-header">
                                             <img
-                                                src={userInfo?.avatar || './default-avatar.png'}
+                                                src={userInfo?.avatar || DEFAULT_AVATAR}
                                                 alt="头像"
                                                 className="dropdown-avatar"
+                                                onError={handleImageError}
                                             />
                                             <div className="dropdown-user-info">
                                                 <strong>{getUserDisplayName(userInfo)}</strong>

@@ -105,3 +105,71 @@ export const formatRelativeTime = (timestamp) => {
         return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
     }
 };
+
+
+// 格式化评论数据（在原有的基础上添加）
+export const formatCommentData = (commentData) => {
+    if (!commentData) return null;
+
+    const processedData = ensureInt64Fields(commentData);
+
+    return {
+        id: processedData.id || 0,
+        videoId: processedData.video_id || 0,
+        parentId: processedData.parent_id || 0,
+        content: processedData.content || '',
+        date: processedData.date || '',
+        likeCount: processedData.like_count || 0,
+        replyCount: processedData.reply_count || 0,
+        isLiked: Boolean(processedData.is_liked),
+
+        // 用户信息
+        user: processedData.user ? {
+            id: processedData.user.id || 0,
+            name: processedData.user.name || '用户',
+            avatar: processedData.user.avatar || './default-avatar.png',
+            isFollowing: Boolean(processedData.user.is_following)
+        } : null,
+
+        // 回复用户信息
+        replyUser: processedData.reply_user ? {
+            id: processedData.reply_user.id || 0,
+            name: processedData.reply_user.name || '用户',
+            avatar: processedData.reply_user.avatar || './default-avatar.png',
+            isFollowing: Boolean(processedData.reply_user.is_following)
+        } : null,
+
+        // 子评论
+        comments: (processedData.comments || []).map(childComment =>
+            formatCommentData(childComment)
+        )
+    };
+};
+
+// 格式化相对时间（评论专用）
+export const formatCommentTime = (dateString) => {
+    if (!dateString) return '刚刚';
+
+    try {
+        const date = new Date(dateString);
+        const now = new Date();
+        const diffInSeconds = Math.floor((now - date) / 1000);
+
+        if (diffInSeconds < 60) {
+            return `${diffInSeconds}秒前`;
+        } else if (diffInSeconds < 3600) {
+            const minutes = Math.floor(diffInSeconds / 60);
+            return `${minutes}分钟前`;
+        } else if (diffInSeconds < 86400) {
+            const hours = Math.floor(diffInSeconds / 3600);
+            return `${hours}小时前`;
+        } else if (diffInSeconds < 604800) {
+            const days = Math.floor(diffInSeconds / 86400);
+            return `${days}天前`;
+        } else {
+            return date.toLocaleDateString();
+        }
+    } catch (error) {
+        return dateString;
+    }
+};

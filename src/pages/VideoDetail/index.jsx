@@ -1,9 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { videoApi } from '../../api/video';
 import { getCurrentUser } from '../../api/user';
 import { formatVideoData } from '../../utils/dataFormat';
+import CommentList from '../../components/Comment/CommentList';
+import CommentInput from '../../components/Comment/CommentInput';
 import './VideoDetail.css';
+
+const DEFAULT_AVATAR = '/default-avatar.png';
 
 const VideoDetail = () => {
     const { id } = useParams();
@@ -13,11 +17,20 @@ const VideoDetail = () => {
     const [isLiked, setIsLiked] = useState(false);
     const [isFollowing, setIsFollowing] = useState(false);
     const [error, setError] = useState(null);
+    const [currentUser, setCurrentUser] = useState(null);
+    const [newCommentAdded, setNewCommentAdded] = useState(0); // 用于触发评论列表更新
+
+    // 评论列表ref，用于调用其内部方法
+    const commentListRef = useRef(null);
 
     useEffect(() => {
         if (id) {
             fetchVideoDetail();
         }
+
+        // 获取当前用户信息
+        const user = getCurrentUser();
+        setCurrentUser(user);
     }, [id]);
 
     const fetchVideoDetail = async () => {
@@ -59,7 +72,7 @@ const VideoDetail = () => {
             description: '这是一个演示视频，展示了美丽的风景。实际视频数据将从服务器获取。',
             author: '系统演示',
             authorId: 1,
-            avatar: './default-avatar.png',
+            avatar: DEFAULT_AVATAR,
             views: '12500',
             likes: '1200',
             comments: 342,
@@ -69,7 +82,8 @@ const VideoDetail = () => {
             uploadTime: '2小时前',
             tags: ['演示', '风景', '自然'],
             isFavorite: false,
-            isFollowing: false
+            isFollowing: false,
+            play_url: '' // 模拟数据可能没有play_url
         };
 
         setVideo(mockVideo);
@@ -93,6 +107,33 @@ const VideoDetail = () => {
         // 这里需要调用关注/取消关注接口
         // 暂时先本地更新
         setIsFollowing(!isFollowing);
+    };
+
+    const handleImageError = (e) => {
+        e.target.onerror = null;
+        e.target.src = DEFAULT_AVATAR;
+    };
+
+    // 处理新评论提交
+    const handleCommentSubmit = (newComment) => {
+        console.log('新评论提交成功:', newComment);
+
+        // 更新评论计数
+        if (video) {
+            setVideo({
+                ...video,
+                comments: (video.comments || 0) + 1
+            });
+        }
+
+        // 触发评论列表重新加载
+        setNewCommentAdded(prev => prev + 1);
+
+        // 如果有commentListRef，可以调用其重新加载方法
+        if (commentListRef.current) {
+            // 这里假设CommentList有reload方法
+            commentListRef.current.reload && commentListRef.current.reload();
+        }
     };
 
     if (loading) {
@@ -154,7 +195,10 @@ const VideoDetail = () => {
                             </video>
                         ) : (
                             <div className="video-placeholder">
-                                <img src={video.thumbnail} alt={video.title} />
+                                <img
+                                    src={video.thumbnail || 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4'}
+                                    alt={video.title}
+                                />
                                 <div className="play-button">▶</div>
                             </div>
                         )}
@@ -166,29 +210,39 @@ const VideoDetail = () => {
 
                         <div className="video-meta-info">
                             <div className="views-count">
-                                <span>👁️ {video.views} 观看</span>
+                                <span>👁️ {video.views || 0} 观看</span>
                             </div>
                             <div className="upload-time">
-                                发布于 {video.uploadTime}
+                                发布于 {video.uploadTime || '刚刚'}
                             </div>
                         </div>
 
-                        <div className="video-description">
-                            <p>{video.description}</p>
+                        {video.description && (
+                            <div className="video-description">
+                                <p>{video.description}</p>
+                            </div>
+                        )}
+
+                        {video.tags && video.tags.length > 0 && (
                             <div className="video-tags">
                                 {video.tags.map(tag => (
                                     <span key={tag} className="tag">#{tag}</span>
                                 ))}
                             </div>
-                        </div>
+                        )}
                     </div>
 
                     {/* 作者信息 */}
                     <div className="author-section">
-                        <Link to={`/user/${video.authorId}`} className="author-info">
-                            <img src={video.avatar} alt={video.author} className="author-avatar" />
+                        <Link to={`/user/${video.authorId || 1}`} className="author-info">
+                            <img
+                                src={video.avatar || DEFAULT_AVATAR}
+                                alt={video.author}
+                                className="author-avatar"
+                                onError={handleImageError}
+                            />
                             <div className="author-details">
-                                <h3>{video.author}</h3>
+                                <h3>{video.author || '用户'}</h3>
                                 <p>短视频创作者</p>
                             </div>
                         </Link>
@@ -203,6 +257,26 @@ const VideoDetail = () => {
                             <button className="message-btn">私信</button>
                         </div>
                     </div>
+
+                    {/* 评论输入区域 */}
+                    <div className="comment-input-section">
+                        <h3>发表评论</h3>
+                        <CommentInput
+                            videoId={video.id}
+                            currentUser={currentUser}
+                            onCommentSubmit={handleCommentSubmit}
+                        />
+                    </div>
+
+                    {/* 评论列表 */}
+                    <div className="comments-section">
+                        <CommentList
+                            key={`comment-list-${video.id}-${newCommentAdded}`} // 强制重新渲染
+                            ref={commentListRef}
+                            videoId={video.id}
+                            initialComments={[]}
+                        />
+                    </div>
                 </div>
 
                 {/* 右侧：互动区域 */}
@@ -213,17 +287,17 @@ const VideoDetail = () => {
                             onClick={handleLike}
                         >
                             <span className="icon">❤️</span>
-                            <span className="count">{isLiked ? video.likes + 1 : video.likes}</span>
+                            <span className="count">{isLiked ? (video.likes || 0) + 1 : video.likes || 0}</span>
                         </button>
 
                         <button className="interaction-btn comment-btn">
                             <span className="icon">💬</span>
-                            <span className="count">{video.comments}</span>
+                            <span className="count">{video.comments || 0}</span>
                         </button>
 
                         <button className="interaction-btn share-btn">
                             <span className="icon">↪️</span>
-                            <span className="count">{video.shares}</span>
+                            <span className="count">{video.shares || 0}</span>
                         </button>
 
                         <button className="interaction-btn collect-btn">
