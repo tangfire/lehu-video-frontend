@@ -937,3 +937,50 @@
     animation: spin 1s linear infinite;
     margin-bottom: 15px;
 }
+
+
+/* 收藏按钮样式 */
+.interaction-btn.collect-btn {
+    color: #666;
+}
+
+.interaction-btn.collect-btn.collected {
+    color: #ffd700;
+}
+
+.interaction-btn.collect-btn.collected .icon {
+    animation: collectAnimation 0.3s ease;
+}
+
+@keyframes collectAnimation {
+    0% {
+        transform: scale(1);
+    }
+    25% {
+        transform: scale(1.2);
+    }
+    50% {
+        transform: scale(0.9);
+    }
+    75% {
+        transform: scale(1.1);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+/* 收藏选择器遮罩层 */
+.collection-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1001;
+    animation: fadeIn 0.3s ease;
+}

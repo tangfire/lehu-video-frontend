@@ -10,6 +10,7 @@ import Login from './pages/Login/index.jsx';
 import Register from './pages/Register/index.jsx';
 import AuthRoute from './components/AuthRoute.jsx';
 import './App.css';
+import Collections from "./pages/Collection/Collections.jsx";
 
 function App() {
     return (
@@ -26,6 +27,11 @@ function App() {
                     <Route path="user/:userId/follow" element={
                         <AuthRoute>
                             <FollowPage />
+                        </AuthRoute>
+                    } />
+                    <Route path="collections" element={
+                        <AuthRoute>
+                            <Collections />
                         </AuthRoute>
                     } />
                     <Route path="settings" element={

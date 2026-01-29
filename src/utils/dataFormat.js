@@ -141,3 +141,25 @@ export const buildCommentTree = (comments) => {
     rootComments.sort((a, b) => new Date(b.date) - new Date(a.date));
     return rootComments;
 };
+
+
+export const formatCollectionData = (collection) => {
+    return {
+        id: parseInt(collection.id) || 0,
+        userId: parseInt(collection.user_id) || 0,
+        name: collection.name || '',
+        description: collection.description || '',
+        videoCount: collection.videoCount || 0,
+        createdAt: collection.created_at || '',
+        updatedAt: collection.updated_at || ''
+    };
+};
+
+export const formatVideoCollectionData = (video) => {
+    const baseVideo = formatVideoData(video);
+    return {
+        ...baseVideo,
+        isCollected: video.isCollected || false,
+        collectedCount: parseInt(video.collectedCount) || 0
+    };
+};

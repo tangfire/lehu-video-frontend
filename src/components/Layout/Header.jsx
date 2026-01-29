@@ -1,7 +1,20 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
 import { getCurrentUser, clearUserData, getUserDisplayName } from '../../api/user';
-import { FiSearch, FiUpload, FiHome, FiUser, FiSettings, FiLogOut, FiMessageCircle, FiBell, FiMenu, FiX, FiUsers } from 'react-icons/fi';
+import {
+    FiSearch,
+    FiUpload,
+    FiHome,
+    FiUser,
+    FiSettings,
+    FiLogOut,
+    FiMessageCircle,
+    FiBell,
+    FiMenu,
+    FiX,
+    FiUsers,
+    FiBookmark
+} from 'react-icons/fi';
 import { IoSparkles } from 'react-icons/io5';
 import './Header.css';
 
@@ -202,6 +215,18 @@ const Header = () => {
                                         >
                                             <FiUsers />
                                             <span>我的关注</span>
+                                        </Link>
+
+                                        <Link
+                                            to="/collections"
+                                            className="dropdown-item"
+                                            onClick={() => {
+                                                closeDropdown();
+                                                setShowMobileMenu(false);
+                                            }}
+                                        >
+                                            <FiBookmark />  {/* 需要导入FiBookmark图标 */}
+                                            <span>我的收藏</span>
                                         </Link>
 
                                         <Link

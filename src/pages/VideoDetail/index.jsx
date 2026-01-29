@@ -7,6 +7,8 @@ import { formatVideoData } from '../../utils/dataFormat';
 import CommentList from '../../components/Comment/CommentList';
 import CommentInput from '../../components/Comment/CommentInput';
 import FollowButton from '../../components/Follow/FollowButton';
+import { collectionApi } from '../../api/collection';
+import CollectionSelector from '../../components/Collection/CollectionSelector';
 import './VideoDetail.css';
 
 const DEFAULT_AVATAR = '/default-avatar.png';
@@ -38,6 +40,10 @@ const VideoDetail = () => {
     const [newCommentAdded, setNewCommentAdded] = useState(0);
     const [isLiking, setIsLiking] = useState(false);
     const [isDisliking, setIsDisliking] = useState(false);
+    const [isCollecting, setIsCollecting] = useState(false);
+    const [showCollectionSelector, setShowCollectionSelector] = useState(false);
+    const [isCollected, setIsCollected] = useState(false);
+    const [collectionCount, setCollectionCount] = useState(0);
 
     const commentListRef = useRef(null);
 
@@ -62,6 +68,10 @@ const VideoDetail = () => {
                 const formattedVideo = formatVideoData(response.video);
                 console.log('格式化后的视频数据:', formattedVideo);
                 setVideo(formattedVideo);
+
+                // 更新收藏状态
+                setIsCollected(formattedVideo.isCollected || false);
+                setCollectionCount(formattedVideo.collectedCount || 0);
 
                 // 设置点赞状态
                 setIsLiked(formattedVideo.isFavorite || false);
@@ -289,12 +299,46 @@ const VideoDetail = () => {
         );
     }
 
+    // 添加收藏处理函数
+    const handleCollect = async () => {
+        if (!currentUser) {
+            setLikeError('请先登录后才能收藏');
+            setTimeout(() => setLikeError(null), 3000);
+            return;
+        }
+
+        setShowCollectionSelector(true);
+    };
+
+    // 添加收藏成功回调
+    const handleCollectionSuccess = () => {
+        setIsCollected(true);
+        setCollectionCount(prev => prev + 1);
+        if (video) {
+            setVideo(prev => ({
+                ...prev,
+                isCollected: true,
+                collectedCount: (prev.collectedCount || 0) + 1
+            }));
+        }
+    };
+
     return (
         <div className="video-detail-container">
             <LikeErrorToast
                 error={likeError}
                 onClose={() => setLikeError(null)}
             />
+
+            {showCollectionSelector && (
+                <div className="collection-modal-overlay">
+                    <CollectionSelector
+                        videoId={video?.id}
+                        onClose={() => setShowCollectionSelector(false)}
+                        onSuccess={handleCollectionSuccess}
+                    />
+                </div>
+            )}
 
             <button className="back-button" onClick={() => navigate(-1)}>
                 ← 返回
@@ -438,9 +482,14 @@ const VideoDetail = () => {
                             <span className="count">{video.shares || 0}</span>
                         </button>
 
-                        <button className="interaction-btn collect-btn">
-                            <span className="icon">⭐</span>
-                            <span className="text">收藏</span>
+                        <button
+                            className={`interaction-btn collect-btn ${isCollected ? 'collected' : ''}`}
+                            onClick={handleCollect}
+                            disabled={isCollecting}
+                        >
+                            <span className="icon">{isCollected ? '⭐️' : '⭐'}</span>
+                            <span className="count">{collectionCount}</span>
+                            {isCollecting && <span className="loading-dot">...</span>}
                         </button>
                     </div>
                 </div>
