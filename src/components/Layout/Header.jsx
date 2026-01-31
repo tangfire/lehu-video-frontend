@@ -26,6 +26,7 @@ const Header = () => {
     const [showDropdown, setShowDropdown] = useState(false);
     const [showMobileMenu, setShowMobileMenu] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [messageUnreadCount, setMessageUnreadCount] = useState(0);
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -41,9 +42,15 @@ const Header = () => {
             if (token && user) {
                 setIsLoggedIn(true);
                 setUserInfo(user);
+
+                // 模拟获取未读消息数（实际应该从API获取）
+                // 这里可以调用 messageApi.getUnreadCount()
+                // 暂时使用模拟数据
+                setMessageUnreadCount(Math.floor(Math.random() * 10));
             } else {
                 setIsLoggedIn(false);
                 setUserInfo(null);
+                setMessageUnreadCount(0);
             }
         };
 
@@ -134,14 +141,20 @@ const Header = () => {
                         <span>首页</span>
                     </Link>
 
-                    <Link
-                        to="/explore"
-                        className="nav-link"
-                        onClick={() => setShowMobileMenu(false)}
-                    >
-                        <FiMessageCircle />
-                        <span>发现</span>
-                    </Link>
+                    {/* 消息入口 */}
+                    {isLoggedIn && (
+                        <Link
+                            to="/chat"
+                            className={`nav-link ${location.pathname.includes('/chat') ? 'active' : ''}`}
+                            onClick={() => setShowMobileMenu(false)}
+                        >
+                            <FiMessageCircle />
+                            <span>消息</span>
+                            {messageUnreadCount > 0 && (
+                                <span className="notification-badge">{messageUnreadCount > 99 ? '99+' : messageUnreadCount}</span>
+                            )}
+                        </Link>
+                    )}
 
                     {isLoggedIn ? (
                         <>
@@ -218,6 +231,30 @@ const Header = () => {
                                         </Link>
 
                                         <Link
+                                            to="/friends"
+                                            className="dropdown-item"
+                                            onClick={() => {
+                                                closeDropdown();
+                                                setShowMobileMenu(false);
+                                            }}
+                                        >
+                                            <FiUsers />
+                                            <span>我的好友</span>
+                                        </Link>
+
+                                        <Link
+                                            to="/groups"
+                                            className="dropdown-item"
+                                            onClick={() => {
+                                                closeDropdown();
+                                                setShowMobileMenu(false);
+                                            }}
+                                        >
+                                            <FiUsers />
+                                            <span>我的群聊</span>
+                                        </Link>
+
+                                        <Link
                                             to="/collections"
                                             className="dropdown-item"
                                             onClick={() => {
@@ -225,7 +262,7 @@ const Header = () => {
                                                 setShowMobileMenu(false);
                                             }}
                                         >
-                                            <FiBookmark />  {/* 需要导入FiBookmark图标 */}
+                                            <FiBookmark />
                                             <span>我的收藏</span>
                                         </Link>
 
