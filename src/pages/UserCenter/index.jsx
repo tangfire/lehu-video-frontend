@@ -23,7 +23,7 @@ const UserCenter = () => {
 
     // 获取当前登录用户
     const currentUser = getCurrentUser();
-    const isCurrentUser = currentUser?.id?.toString() === userId;
+    const isCurrentUser = currentUser?.id === userId;
 
     // 模拟获取用户信息
     useEffect(() => {
@@ -125,7 +125,7 @@ const UserCenter = () => {
                             {!isCurrentUser ? (
                                 <>
                                     <FollowButton
-                                        userId={parseInt(userId)}
+                                        userId={userId}
                                         initialIsFollowing={isFollowing}
                                         onFollowChange={handleFollowChange}
                                         size="medium"
@@ -208,7 +208,7 @@ const UserCenter = () => {
                         {/* 关注列表 */}
                         <div className="follow-list-wrapper">
                             <FollowList
-                                userId={parseInt(userId)}
+                                userId={userId}
                                 type={followType}
                                 showTitle={false}
                             />

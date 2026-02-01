@@ -10,7 +10,7 @@ import './Chat.css';
 const ChatList = () => {
     const [conversations, setConversations] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState('all'); // 'all', 'single', 'group'
+    const [activeTab, setActiveTab] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
     const [filteredConversations, setFilteredConversations] = useState([]);
     const [error, setError] = useState(null);
@@ -33,26 +33,33 @@ const ChatList = () => {
 
             setError(null);
 
-            // 修改参数结构，匹配proto定义
             const response = await messageApi.listConversations({
-                page_stats: {
-                    page: pageNum,
-                    size: 20
-                }
+                page: pageNum,
+                page_size: 20
             });
 
             if (response && response.conversations) {
+                const formattedConversations = response.conversations.map(conv => ({
+                    ...conv,
+                    // 确保所有ID都是字符串
+                    id: String(conv.id),
+                    target_id: String(conv.target_id),
+                    group_id: conv.group_id ? String(conv.group_id) : '',
+                    member_count: Number(conv.member_count || 0),
+                    unread_count: Number(conv.unread_count || 0)
+                }));
+
                 if (pageNum === 1) {
-                    setConversations(response.conversations);
+                    setConversations(formattedConversations);
                 } else {
-                    setConversations(prev => [...prev, ...response.conversations]);
+                    setConversations(prev => [...prev, ...formattedConversations]);
                 }
 
                 setHasMore(response.page_stats?.has_next || false);
                 setPage(pageNum);
 
                 // 重新计算过滤后的列表
-                filterConversations(response.conversations, activeTab, searchQuery, pageNum === 1);
+                filterConversations(formattedConversations, activeTab, searchQuery, pageNum === 1);
             } else {
                 setConversations([]);
                 setFilteredConversations([]);
@@ -61,7 +68,6 @@ const ChatList = () => {
             console.error('获取会话列表失败:', error);
             setError('获取会话列表失败，请检查网络连接');
 
-            // 如果未登录，显示提示
             if (error.response?.status === 401) {
                 setError('请先登录');
             }
@@ -88,10 +94,11 @@ const ChatList = () => {
             filtered = filtered.filter(conv => {
                 const name = conv.name ? conv.name.toLowerCase() : '';
                 const lastMessage = conv.last_message ? conv.last_message.toLowerCase() : '';
+                const targetId = conv.target_id ? String(conv.target_id).toLowerCase() : '';
 
                 return name.includes(searchStr) ||
                     lastMessage.includes(searchStr) ||
-                    conv.target_id?.toString().includes(searchStr);
+                    targetId.includes(searchStr);
             });
         }
 
@@ -136,7 +143,6 @@ const ChatList = () => {
             setConversations(prev => prev.filter(conv => conv.id !== conversationId));
             setFilteredConversations(prev => prev.filter(conv => conv.id !== conversationId));
 
-            // 如果有未读计数更新，可能需要重新获取总未读数
         } catch (error) {
             console.error('删除会话失败:', error);
             alert('删除失败，请重试');
@@ -147,48 +153,53 @@ const ChatList = () => {
     const handleCreateConversation = async (type = 'single') => {
         if (type === 'single') {
             const friendId = prompt('请输入好友ID：');
-            if (friendId && !isNaN(friendId)) {
+            if (friendId && friendId.trim()) {
                 try {
                     const response = await messageApi.createConversation(
-                        parseInt(friendId),
+                        friendId.trim(),
                         0,
                         '你好，我们开始聊天吧！'
                     );
 
                     if (response && response.conversation_id) {
-                        // 创建成功后刷新列表或直接跳转
+                        // 刷新会话列表
+                        fetchConversations(1, true);
+                        // 跳转到聊天
                         navigate(`/chat/single/${friendId}`, {
-                            state: { conversationId: response.conversation_id }
+                            state: {
+                                conversationId: response.conversation_id,
+                                targetId: friendId
+                            }
                         });
                     }
                 } catch (error) {
                     console.error('创建会话失败:', error);
                     alert('创建会话失败，请检查好友关系或网络连接');
                 }
-            } else if (friendId) {
-                alert('请输入有效的用户ID');
             }
         } else if (type === 'group') {
             const groupId = prompt('请输入群组ID：');
-            if (groupId && !isNaN(groupId)) {
+            if (groupId && groupId.trim()) {
                 try {
                     const response = await messageApi.createConversation(
-                        parseInt(groupId),
+                        groupId.trim(),
                         1,
                         '大家好！'
                     );
 
                     if (response && response.conversation_id) {
+                        fetchConversations(1, true);
                         navigate(`/chat/group/${groupId}`, {
-                            state: { conversationId: response.conversation_id }
+                            state: {
+                                conversationId: response.conversation_id,
+                                targetId: groupId
+                            }
                         });
                     }
                 } catch (error) {
                     console.error('创建会话失败:', error);
                     alert('创建会话失败，请检查是否已加入该群');
                 }
-            } else if (groupId) {
-                alert('请输入有效的群组ID');
             }
         }
     };
@@ -240,29 +251,25 @@ const ChatList = () => {
         if (!timestamp || timestamp === 0) return '';
 
         try {
-            const date = new Date(timestamp * 1000);
+            // 如果时间戳是秒，转换为毫秒
+            const msTimestamp = timestamp < 1000000000000 ? timestamp * 1000 : timestamp;
+            const date = new Date(msTimestamp);
             const now = new Date();
             const diffMs = now - date;
             const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-            // 如果时间在今天
-            if (date.toDateString() === now.toDateString()) {
+            if (diffDays === 0) {
                 return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            }
-            // 如果时间是昨天
-            else if (diffDays === 1) {
+            } else if (diffDays === 1) {
                 return '昨天';
-            }
-            // 如果在一周内
-            else if (diffDays < 7) {
+            } else if (diffDays < 7) {
                 const days = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
                 return days[date.getDay()];
-            }
-            // 其他情况显示日期
-            else {
+            } else {
                 return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
             }
         } catch (error) {
+            console.error('格式化时间错误:', error);
             return '';
         }
     };
@@ -270,12 +277,12 @@ const ChatList = () => {
     // 获取消息类型图标
     const getMessageTypeIcon = (msgType) => {
         switch (msgType) {
-            case 0: return '💬'; // 文本
-            case 1: return '🖼️'; // 图片
-            case 2: return '🎵'; // 语音
-            case 3: return '🎬'; // 视频
-            case 4: return '📎'; // 文件
-            case 99: return '📢'; // 系统消息
+            case 0: return '💬';
+            case 1: return '🖼️';
+            case 2: return '🎵';
+            case 3: return '🎬';
+            case 4: return '📎';
+            case 99: return '📢';
             default: return '💬';
         }
     };
@@ -286,28 +293,21 @@ const ChatList = () => {
 
         const lastMessage = conversation.last_message;
 
-        // 根据消息类型返回不同预览
         switch (conversation.last_msg_type) {
-            case 0: // 文本
+            case 0:
                 return lastMessage.length > 30 ? lastMessage.substring(0, 30) + '...' : lastMessage;
-            case 1: // 图片
-                return '[图片]';
-            case 2: // 语音
-                return '[语音消息]';
-            case 3: // 视频
-                return '[视频]';
-            case 4: // 文件
-                return '[文件]';
-            case 99: // 系统消息
-                return '[系统消息]';
-            default:
-                return lastMessage;
+            case 1: return '[图片]';
+            case 2: return '[语音消息]';
+            case 3: return '[视频]';
+            case 4: return '[文件]';
+            case 99: return '[系统消息]';
+            default: return lastMessage;
         }
     };
 
     // 获取会话名称
     const getConversationName = (conversation) => {
-        if (conversation.name) return conversation.name;
+        if (conversation.name && conversation.name.trim()) return conversation.name;
 
         if (conversation.type === 0) {
             return `用户${conversation.target_id}`;
@@ -318,7 +318,7 @@ const ChatList = () => {
 
     // 获取会话头像
     const getConversationAvatar = (conversation) => {
-        if (conversation.avatar) return conversation.avatar;
+        if (conversation.avatar && conversation.avatar.trim()) return conversation.avatar;
 
         if (conversation.type === 0) {
             return '/default-avatar.png';
@@ -339,7 +339,7 @@ const ChatList = () => {
         fetchConversations(1, true);
     };
 
-    // 监听WebSocket连接状态，连接成功时刷新列表
+    // 监听WebSocket连接状态
     useEffect(() => {
         if (connectionStatus === 'connected') {
             fetchConversations(1, true);
@@ -350,7 +350,7 @@ const ChatList = () => {
     useEffect(() => {
         fetchConversations(1);
 
-        // 设置自动刷新间隔（每30秒检查一次新消息）
+        // 设置自动刷新间隔
         const intervalId = setInterval(() => {
             if (connectionStatus === 'connected') {
                 fetchConversations(1, true);
@@ -363,11 +363,7 @@ const ChatList = () => {
     // 监听搜索词变化
     useEffect(() => {
         const timeoutId = setTimeout(() => {
-            if (searchQuery.trim()) {
-                filterConversations(conversations, activeTab, searchQuery, true);
-            } else {
-                filterConversations(conversations, activeTab, '', true);
-            }
+            filterConversations(conversations, activeTab, searchQuery, true);
         }, 300);
 
         return () => clearTimeout(timeoutId);
@@ -375,25 +371,15 @@ const ChatList = () => {
 
     // 计算总未读消息数
     const totalUnreadCount = useMemo(() => {
-        return conversations.reduce((total, conv) => total + (conv.unread_count || 0), 0);
+        return conversations.reduce((total, conv) => total + (Number(conv.unread_count) || 0), 0);
     }, [conversations]);
 
-    // 渲染加载状态
     if (loading && conversations.length === 0) {
         return (
             <div className="chat-list-page">
                 <div className="chat-list-header">
                     <h2>消息</h2>
-                    <div className="chat-list-actions">
-                        <button className="new-chat-btn" title="新建单聊">
-                            💬
-                        </button>
-                        <button className="new-group-btn" title="新建群聊">
-                            👥
-                        </button>
-                    </div>
                 </div>
-
                 <div className="chat-list-loading">
                     <div className="loading-spinner"></div>
                     <p>加载会话中...</p>
@@ -402,29 +388,21 @@ const ChatList = () => {
         );
     }
 
-    // 渲染错误状态
     if (error && conversations.length === 0) {
         return (
             <div className="chat-list-page">
                 <div className="chat-list-header">
                     <h2>消息</h2>
                 </div>
-
                 <div className="chat-list-error">
                     <div className="error-icon">⚠️</div>
                     <h3>{error}</h3>
                     <div className="error-actions">
-                        <button
-                            className="retry-btn"
-                            onClick={handleRefresh}
-                        >
+                        <button className="retry-btn" onClick={handleRefresh}>
                             重试
                         </button>
                         {connectionStatus !== 'connected' && (
-                            <button
-                                className="reconnect-btn"
-                                onClick={reconnect}
-                            >
+                            <button className="reconnect-btn" onClick={reconnect}>
                                 重新连接
                             </button>
                         )}
@@ -491,7 +469,7 @@ const ChatList = () => {
                     单聊
                     {activeTab === 'single' && (
                         <span className="tab-badge">
-                            {conversations.filter(c => c.type === 0).reduce((sum, c) => sum + (c.unread_count || 0), 0)}
+                            {conversations.filter(c => c.type === 0).reduce((sum, c) => sum + (Number(c.unread_count) || 0), 0)}
                         </span>
                     )}
                 </button>
@@ -502,7 +480,7 @@ const ChatList = () => {
                     群聊
                     {activeTab === 'group' && (
                         <span className="tab-badge">
-                            {conversations.filter(c => c.type === 1).reduce((sum, c) => sum + (c.unread_count || 0), 0)}
+                            {conversations.filter(c => c.type === 1).reduce((sum, c) => sum + (Number(c.unread_count) || 0), 0)}
                         </span>
                     )}
                 </button>
@@ -539,21 +517,18 @@ const ChatList = () => {
                                 key={conversation.id}
                                 className={`chat-list-item ${conversation.unread_count > 0 ? 'unread' : ''}`}
                                 onClick={() => {
+                                    const state = {
+                                        conversationId: conversation.id,
+                                        conversationName: conversation.name
+                                    };
+
                                     if (conversation.type === 0) {
-                                        // 单聊
                                         navigate(`/chat/single/${conversation.target_id}`, {
-                                            state: {
-                                                conversationId: conversation.id,
-                                                conversationName: conversation.name
-                                            }
+                                            state: state
                                         });
                                     } else {
-                                        // 群聊
-                                        navigate(`/chat/group/${conversation.group_id || conversation.target_id}`, {
-                                            state: {
-                                                conversationId: conversation.id,
-                                                conversationName: conversation.name
-                                            }
+                                        navigate(`/chat/group/${conversation.target_id}`, {
+                                            state: state
                                         });
                                     }
                                 }}

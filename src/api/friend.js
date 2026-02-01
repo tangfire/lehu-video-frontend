@@ -12,7 +12,7 @@ export const friendApi = {
     // 发送好友申请
     sendFriendApply: (receiverId, applyReason = '') => {
         return request.post('/friend/apply', {
-            receiver_id: receiverId,
+            receiver_id: receiverId,  // 直接传字符串
             apply_reason: applyReason
         });
     },

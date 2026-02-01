@@ -27,13 +27,16 @@ const ChatRoom = () => {
     const {
         sendTypingStatus,
         sendReadReceipt,
-        recallMessage: wsRecallMessage
+        recallMessage: wsRecallMessage,
+        sendMessage: wsSendMessage,
+        messageStatusUpdates,
+        isTyping,
+        getMessageStatusUpdate,
+        clearMessageStatusUpdate
     } = useWebSocket();
 
-    // 添加调试信息
     console.log('ChatRoom 参数:', { type, targetId, conversationId, locationState: location.state });
 
-    // 如果没有 conversationId，显示错误
     if (!conversationId) {
         return (
             <div className="chat-room-error">
@@ -45,39 +48,54 @@ const ChatRoom = () => {
         );
     }
 
-    const {
-        sendMessage: wsSendMessage,
-        messageStatusUpdates, // 直接从 context 拿到这个 Map
-        isTyping
-    } = useWebSocket();
-    // 监听消息状态更新
-    // 核心修改：监听状态更新 Map
     useEffect(() => {
         if (messageStatusUpdates.size === 0) return;
 
         setMessages(prev => {
-            let hasChanged = false;
-            const newMessages = prev.map(msg => {
-                // 1. 尝试用当前消息 ID 去 Map 里找有没有更新
-                // 强制转 String 避免 Snowflake ID 精度问题
-                const update = messageStatusUpdates.get(String(msg.id));
+            let hasAnyChange = false;
 
-                if (update && msg.status !== update.status) {
-                    hasChanged = true;
-                    console.log(`更新消息 [${msg.id}] 状态为: ${update.status}`);
-                    return {
-                        ...msg,
-                        // 如果有后端返回的正式 ID，把 temp_id 替换掉
-                        id: update.messageId || msg.id,
-                        status: update.status
-                    };
+            // 1. 先进行映射处理
+            const next = prev.map(msg => {
+                const update = messageStatusUpdates.get(String(msg.id));
+                if (!update) return msg;
+
+                let newMsg = { ...msg };
+                let currentMsgChanged = false;
+
+                // 处理 ID 升级
+                if (String(msg.id).startsWith('temp_') && update.message_id) {
+                    console.log('升级消息 ID:', msg.id, '→', update.message_id);
+                    newMsg.id = String(update.message_id);
+                    currentMsgChanged = true;
                 }
-                return msg;
+
+                // 处理状态更新
+                if (update.status !== undefined && newMsg.status !== update.status) {
+                    newMsg.status = update.status;
+                    currentMsgChanged = true;
+                }
+
+                if (currentMsgChanged) hasAnyChange = true;
+                return newMsg;
             });
 
-            return hasChanged ? newMessages : prev;
+            // 2. 如果发生了变化（特别是 ID 升级），必须强制去重
+            if (hasAnyChange) {
+                const uniqueMap = new Map();
+                next.forEach(m => {
+                    const idStr = String(m.id);
+                    // 如果 ID 冲突了，保留最新的那个（通常是刚升级的这条）
+                    uniqueMap.set(idStr, m);
+                });
+                return Array.from(uniqueMap.values());
+            }
+
+            return prev;
         });
-    }, [messageStatusUpdates]); // 依赖项是 Map，只要 Provider 里更新了，这里就会跑
+    }, [messageStatusUpdates]);
+
+
+
 
     // 获取会话信息
     useEffect(() => {
@@ -85,15 +103,21 @@ const ChatRoom = () => {
             try {
                 if (type === 'single') {
                     // 单聊：获取好友信息
-                    const response = await friendApi.checkFriendRelation(targetId);
-                    // 获取用户详细信息
-                    const userResponse = await friendApi.searchUsers('', { page: 1, page_size: 1 });
-                    const user = userResponse.users.find(u => u.id === parseInt(targetId));
-                    setTargetInfo(user);
+                    const userResponse = await friendApi.searchUsers('', { page: 1, page_size: 50 });
+                    const user = userResponse.users.find(u => String(u.id) === String(targetId));
+                    if (user) {
+                        setTargetInfo({
+                            ...user,
+                            id: String(user.id)
+                        });
+                    }
                 } else if (type === 'group') {
                     // 群聊：获取群组信息
                     const response = await groupApi.getGroupInfo(targetId);
-                    setTargetInfo(response.group);
+                    setTargetInfo({
+                        ...response.group,
+                        id: String(response.group.id)
+                    });
                 }
             } catch (error) {
                 console.error('获取会话信息失败:', error);
@@ -116,16 +140,38 @@ const ChatRoom = () => {
                 setLoadingMore(true);
             }
 
+            // 注意：向上拉取历史消息，通常是基于当前列表的第一条消息 ID 往回找
+            const referenceId = pageNum === 1 ? "0" : messages[0]?.id || "0";
+
             const response = await messageApi.listMessages(
                 conversationId,
-                pageNum === 1 ? 0 : messages[messages.length - 1]?.id || 0,
+                referenceId,
                 20
             );
 
+            const formattedMessages = (response.messages || []).map(msg => ({
+                ...msg,
+                id: String(msg.id),
+                sender_id: String(msg.sender_id),
+                receiver_id: String(msg.receiver_id),
+                conversation_id: String(msg.conversation_id),
+                status: msg.status || 0
+            }));
+
             if (pageNum === 1) {
-                setMessages(response.messages || []);
+                setMessages(formattedMessages);
             } else {
-                setMessages(prev => [...(response.messages || []), ...prev]);
+                setMessages(prev => {
+                    // --- 关键去重逻辑 ---
+                    // 创建一个当前已有 ID 的集合
+                    const existingIds = new Set(prev.map(m => String(m.id)));
+                    // 过滤掉已经在列表中存在的历史消息
+                    const newUniqueMessages = formattedMessages.filter(
+                        m => !existingIds.has(String(m.id))
+                    );
+                    // 将真正“新”的历史消息拼在前面
+                    return [...newUniqueMessages, ...prev];
+                });
             }
 
             setHasMore(response.has_more || false);
@@ -156,30 +202,46 @@ const ChatRoom = () => {
         if (!inputMessage.trim() || !currentUser) return;
 
         // 生成唯一的客户端 ID
-        const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+        const clientMsgId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
 
         const messagePayload = {
-            receiver_id: parseInt(targetId),
+            receiver_id: String(targetId),
             conv_type: type === 'single' ? 0 : 1,
             msg_type: 0,
             content: { text: inputMessage.trim() },
-            client_msg_id: tempId // 确保这个 ID 传进去了
+            client_msg_id: clientMsgId
         };
+
+        console.log('发送消息 payload:', messagePayload);
 
         // 先把临时消息塞进 UI
         const tempMessage = {
-            id: tempId, // 初始使用 tempId
-            sender_id: currentUser.id,
+            id: clientMsgId,
+            sender_id: String(currentUser.id),
+            receiver_id: String(targetId),
+            conversation_id: String(conversationId),
+            conv_type: type === 'single' ? 0 : 1,
+            msg_type: 0,
             content: { text: inputMessage.trim() },
             status: 0, // SENDING
+            is_recalled: false,
             created_at: new Date().toISOString()
         };
 
+        console.log('添加临时消息:', tempMessage);
         setMessages(prev => [...prev, tempMessage]);
         setInputMessage('');
 
         // 发送给 WS
-        wsSendMessage(messagePayload);
+        const success = wsSendMessage(messagePayload);
+        if (!success) {
+            console.error('WebSocket发送失败');
+            // 发送失败，更新状态
+            setMessages(prev => prev.map(msg =>
+                msg.id === clientMsgId ? { ...msg, status: 99 } : msg
+            ));
+        }
+
         scrollToBottom();
     };
 
@@ -190,9 +252,9 @@ const ChatRoom = () => {
 
         // 发送输入状态
         if (value.trim()) {
-            sendTypingStatus(parseInt(targetId), type === 'single' ? 0 : 1, true, value);
+            sendTypingStatus(targetId, type === 'single' ? 0 : 1, true, value);
         } else {
-            sendTypingStatus(parseInt(targetId), type === 'single' ? 0 : 1, false);
+            sendTypingStatus(targetId, type === 'single' ? 0 : 1, false);
         }
     };
 
@@ -211,7 +273,7 @@ const ChatRoom = () => {
             if (success) {
                 setMessages(prev =>
                     prev.map(msg =>
-                        msg.id === messageId
+                        String(msg.id) === String(messageId)
                             ? { ...msg, is_recalled: true, status: 4 }
                             : msg
                     )
@@ -226,7 +288,7 @@ const ChatRoom = () => {
     const markMessagesAsRead = useCallback(async () => {
         if (messages.length > 0 && conversationId) {
             const lastMessage = messages[messages.length - 1];
-            if (lastMessage && lastMessage.sender_id !== currentUser.id) {
+            if (lastMessage && String(lastMessage.sender_id) !== String(currentUser.id)) {
                 try {
                     await messageApi.markMessagesRead(conversationId, lastMessage.id);
                     // 通过WebSocket发送已读回执
@@ -261,15 +323,20 @@ const ChatRoom = () => {
 
     const formatTime = (timestamp) => {
         try {
+            let date;
             if (typeof timestamp === 'string') {
-                const date = new Date(timestamp);
-                return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                date = new Date(timestamp);
             } else if (typeof timestamp === 'number') {
-                const date = new Date(timestamp);
-                return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                // 如果时间戳是秒，转换为毫秒
+                const msTimestamp = timestamp < 1000000000000 ? timestamp * 1000 : timestamp;
+                date = new Date(msTimestamp);
+            } else {
+                return '';
             }
-            return '';
+
+            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         } catch (error) {
+            console.error('格式化时间错误:', error);
             return '';
         }
     };
@@ -303,20 +370,28 @@ const ChatRoom = () => {
                     ←
                 </button>
                 <div className="chat-header-info">
-                    {targetInfo && (
+                    {targetInfo ? (
                         <>
                             <img
                                 src={targetInfo.avatar || '/default-avatar.png'}
                                 alt={targetInfo.name}
                                 className="chat-header-avatar"
+                                onError={(e) => {
+                                    e.target.src = type === 'single' ? '/default-avatar.png' : '/default-group-avatar.png';
+                                }}
                             />
                             <div className="chat-header-details">
-                                <h3>{targetInfo.name || '未知用户'}</h3>
+                                <h3>{targetInfo.name || (type === 'single' ? `用户${targetId}` : `群组${targetId}`)}</h3>
                                 <p className="chat-status">
-                                    {type === 'group' ? `${targetInfo.member_cnt || 0} 名成员` : '在线'}
+                                    {type === 'group' ? `${targetInfo.member_cnt || targetInfo.member_count || 0} 名成员` : '在线'}
                                 </p>
                             </div>
                         </>
+                    ) : (
+                        <div className="chat-header-details">
+                            <h3>{type === 'single' ? `用户${targetId}` : `群组${targetId}`}</h3>
+                            <p className="chat-status">加载中...</p>
+                        </div>
                     )}
                 </div>
                 <div className="chat-header-actions">
@@ -344,64 +419,69 @@ const ChatRoom = () => {
                 )}
 
                 <div className="chat-messages">
-                    {messages.map((message) => (
-                        <div
-                            key={message.id}
-                            className={`message-item ${
-                                message.sender_id === currentUser.id ? 'sent' : 'received'
-                            } ${message.is_recalled ? 'recalled' : ''}`}
-                        >
-                            {message.is_recalled ? (
-                                <div className="message-content">
-                                    <p className="message-text">消息已被撤回</p>
-                                </div>
-                            ) : (
-                                <>
+                    {messages.map((message) => {
+                        // 获取消息状态更新
+                        const displayStatus = message.status;
+
+                        return (
+                            <div
+                                key={message.id}
+                                className={`message-item ${
+                                    String(message.sender_id) === String(currentUser.id) ? 'sent' : 'received'
+                                } ${message.is_recalled ? 'recalled' : ''}`}
+                            >
+                                {message.is_recalled ? (
                                     <div className="message-content">
-                                        {message.content?.text && (
-                                            <p className="message-text">{message.content.text}</p>
-                                        )}
-                                        {message.content?.image_url && (
-                                            <img
-                                                src={message.content.image_url}
-                                                alt="消息图片"
-                                                className="message-image"
-                                            />
-                                        )}
-                                        {message.content?.voice_url && (
-                                            <div className="message-voice">
-                                                <audio controls src={message.content.voice_url} />
-                                                <span>{message.content.voice_duration}s</span>
-                                            </div>
-                                        )}
+                                        <p className="message-text recall-text">消息已被撤回</p>
                                     </div>
-                                    <div className="message-meta">
-                                        <span className="message-time">
-                                            {formatTime(message.created_at)}
-                                        </span>
-                                        {message.sender_id === currentUser.id && (
-                                            <span className={`message-status status-${message.status}`}>
-                                                {getStatusText(message.status)}
+                                ) : (
+                                    <>
+                                        <div className="message-content">
+                                            {message.content?.text && (
+                                                <p className="message-text">{message.content.text}</p>
+                                            )}
+                                            {message.content?.image_url && (
+                                                <img
+                                                    src={message.content.image_url}
+                                                    alt="消息图片"
+                                                    className="message-image"
+                                                />
+                                            )}
+                                            {message.content?.voice_url && (
+                                                <div className="message-voice">
+                                                    <audio controls src={message.content.voice_url} />
+                                                    <span>{message.content.voice_duration}s</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="message-meta">
+                                            <span className="message-time">
+                                                {formatTime(message.created_at)}
                                             </span>
+                                            {String(message.sender_id) === String(currentUser.id) && (
+                                                <span className={`message-status status-${displayStatus}`}>
+                                                    {getStatusText(displayStatus)}
+                                                </span>
+                                            )}
+                                        </div>
+                                        {String(message.sender_id) === String(currentUser.id) && !message.is_recalled && displayStatus !== 4 && (
+                                            <button
+                                                className="message-recall-btn"
+                                                onClick={() => handleRecallMessage(message.id)}
+                                                title="撤回消息"
+                                            >
+                                                撤回
+                                            </button>
                                         )}
-                                    </div>
-                                    {message.sender_id === currentUser.id && !message.is_recalled && message.status !== 4 && (
-                                        <button
-                                            className="message-recall-btn"
-                                            onClick={() => handleRecallMessage(message.id)}
-                                            title="撤回消息"
-                                        >
-                                            撤回
-                                        </button>
-                                    )}
-                                </>
-                            )}
-                        </div>
-                    ))}
+                                    </>
+                                )}
+                            </div>
+                        );
+                    })}
                     <div ref={messagesEndRef} />
                 </div>
 
-                {isTyping(parseInt(targetId), conversationId) && (
+                {isTyping(String(targetId), String(conversationId)) && (
                     <div className="typing-indicator">
                         <span className="typing-dot"></span>
                         <span className="typing-dot"></span>

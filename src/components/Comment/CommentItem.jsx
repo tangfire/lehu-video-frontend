@@ -27,7 +27,15 @@ const CommentItem = ({
     const [isLiking, setIsLiking] = useState(false);
     const [isDisliking, setIsDisliking] = useState(false);
 
-    const isCurrentUser = currentUserId === comment.user?.id;
+    // 安全地获取用户信息
+    const user = comment?.user || {
+        id: "0",
+        name: '用户',
+        avatar: DEFAULT_AVATAR
+    };
+
+    const replyUser = comment?.replyUser;
+    const isCurrentUser = currentUserId === user.id;
 
     const handleLike = async () => {
         if (!currentUserId) {
@@ -67,8 +75,8 @@ const CommentItem = ({
 
     const handleReply = () => {
         if (onReply) {
-            onReply(comment.id, comment.user);
-            setLocalReplyContent(`@${comment.user?.name || '用户'} `);
+            onReply(comment.id, user);
+            setLocalReplyContent(`@${user.name} `);
         }
     };
 
@@ -128,12 +136,12 @@ const CommentItem = ({
         <div className={`comment-item ${depth > 0 ? 'child-comment' : ''}`}>
             <div className="comment-content">
                 <Link
-                    to={`/user/${comment.user?.id}`}
+                    to={`/user/${user.id}`}
                     className="comment-avatar"
                 >
                     <img
-                        src={comment.user?.avatar || DEFAULT_AVATAR}
-                        alt={comment.user?.name}
+                        src={user.avatar || DEFAULT_AVATAR}
+                        alt={user.name}
                         onError={handleImageError}
                     />
                 </Link>
@@ -142,20 +150,20 @@ const CommentItem = ({
                     <div className="comment-header">
                         <div className="comment-user-info">
                             <Link
-                                to={`/user/${comment.user?.id}`}
+                                to={`/user/${user.id}`}
                                 className="comment-username"
                             >
-                                {comment.user?.name || '用户'}
+                                {user.name}
                             </Link>
 
-                            {comment.replyUser && (
+                            {replyUser && (
                                 <span className="reply-to">
                                     回复
                                     <Link
-                                        to={`/user/${comment.replyUser?.id}`}
+                                        to={`/user/${replyUser.id}`}
                                         className="reply-username"
                                     >
-                                        {comment.replyUser?.name}
+                                        {replyUser.name}
                                     </Link>
                                 </span>
                             )}

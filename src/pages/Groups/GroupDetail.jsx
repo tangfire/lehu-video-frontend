@@ -34,8 +34,7 @@ const GroupDetail = () => {
                 });
                 setNewNotice(response.group.notice || '');
 
-                // 这里应该调用获取群成员的API，但后端没有提供，我们模拟一些数据
-                // TODO: 替换为实际的获取群成员API
+                // 模拟成员数据
                 const mockMembers = [
                     { id: response.group.owner_id, name: '群主', role: 'owner' },
                     { id: currentUser?.id, name: currentUser?.name, role: 'member' }
@@ -43,7 +42,7 @@ const GroupDetail = () => {
                 setMembers(mockMembers);
 
                 // 获取在线状态
-                const userIds = mockMembers.map(m => m.id);
+                const userIds = mockMembers.map(m => String(m.id)); // 转字符串
                 if (userIds.length > 0) {
                     const onlineResponse = await friendApi.batchGetUserOnlineStatus(userIds);
                     if (onlineResponse && onlineResponse.online_status) {

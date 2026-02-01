@@ -92,11 +92,9 @@ const GroupList = () => {
     const handleJoinGroup = async (groupId, addMode) => {
         try {
             if (addMode === 0) {
-                // 直接加入
                 await groupApi.enterGroupDirectly(groupId);
                 alert('加入群组成功！');
             } else {
-                // 需要申请
                 const reason = prompt('请输入申请理由：');
                 if (reason !== null) {
                     await groupApi.applyJoinGroup(groupId, reason);
@@ -104,7 +102,6 @@ const GroupList = () => {
                 }
             }
 
-            // 刷新列表
             fetchGroups('joined');
         } catch (error) {
             console.error('加入群组失败:', error);
@@ -322,7 +319,6 @@ const GroupList = () => {
                                 onClick={() => {
                                     const groupId = prompt('请输入群组ID：');
                                     if (groupId) {
-                                        // 先检查加群方式
                                         groupApi.checkGroupAddMode(groupId)
                                             .then(response => {
                                                 const addMode = response.add_mode;

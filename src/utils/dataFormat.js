@@ -1,32 +1,61 @@
+// src/utils/dataFormat.js
 /**
  * 数据格式化工具
  */
 
 /**
- * 确保int64字段是整数
+ * 确保int64字段是整数，ID字段是字符串
  */
 export const ensureInt64Fields = (data) => {
     if (!data || typeof data !== 'object') return data;
 
     const result = { ...data };
+
+    // ID字段 - 必须保持为字符串
+    const stringIdFields = [
+        'id', 'user_id', 'video_id', 'file_id', 'collection_id',
+        'parent_id', 'reply_user_id', 'comment_id',
+        'userId', 'videoId', 'collectionId', 'parentId', 'replyUserId', 'commentId'
+    ];
+
+    // int64字段 - 转换为数字
     const int64Fields = [
-        'latest_time', 'user_id', 'feed_num', 'video_id', 'file_id',
-        'id', 'favoriteCount', 'commentCount', 'collectedCount'
+        'page', 'size', 'limit', 'feed_num', 'latest_time',
+        'favoriteCount', 'commentCount', 'collectedCount',
+        'like_count', 'dislike_count', 'reply_count'
     ];
 
     Object.keys(result).forEach(key => {
-        if (int64Fields.includes(key)) {
-            const value = result[key];
-            if (value !== undefined && value !== null) {
-                if (typeof value === 'number') {
-                    result[key] = Math.floor(value);
-                } else if (typeof value === 'string') {
-                    const num = parseInt(value, 10);
-                    result[key] = isNaN(num) ? 0 : num;
-                }
-            } else {
-                result[key] = 0;
+        const value = result[key];
+
+        if (value === undefined || value === null) {
+            return;
+        }
+
+        // 处理ID字段
+        if (stringIdFields.includes(key)) {
+            if (typeof value === 'number') {
+                result[key] = String(value);
+            } else if (typeof value === 'string') {
+                // 确保空字符串转为"0"
+                result[key] = value.trim() === '' ? '0' : value;
             }
+        }
+        // 处理int64字段
+        else if (int64Fields.includes(key)) {
+            if (typeof value === 'string') {
+                const num = parseInt(value, 10);
+                result[key] = isNaN(num) ? 0 : num;
+            }
+        }
+
+        // 递归处理嵌套对象和数组
+        if (Array.isArray(value)) {
+            result[key] = value.map(item =>
+                typeof item === 'object' && item !== null ? ensureInt64Fields(item) : item
+            );
+        } else if (typeof value === 'object' && value !== null) {
+            result[key] = ensureInt64Fields(value);
         }
     });
 
@@ -39,12 +68,16 @@ export const ensureInt64Fields = (data) => {
 export const formatVideoData = (videoData) => {
     if (!videoData) return null;
 
+    // 提取ID字段并确保为字符串
+    const videoId = videoData.id ? String(videoData.id) : "0";
+    const authorId = videoData.author?.id ? String(videoData.author.id) : "0";
+
     return {
-        id: videoData.id || 0,
+        id: videoId,
         title: videoData.title || '无标题',
         description: videoData.description || '',
         author: videoData.author?.name || '用户',
-        authorId: videoData.author?.id || 0,
+        authorId: authorId,
         avatar: videoData.author?.avatar || '/default-avatar.png',
         views: videoData.playCount || videoData.views || 0,
         likes: videoData.favoriteCount || videoData.likes || 0,
@@ -70,16 +103,22 @@ export const formatVideoData = (videoData) => {
 export const formatCommentData = (commentData) => {
     if (!commentData) return null;
 
+    // 提取ID字段并确保为字符串
+    const commentId = commentData.id ? String(commentData.id) : "0";
+    const userId = commentData.user?.id ? String(commentData.user.id) : "0";
+    const replyUserId = commentData.replyUser?.id ? String(commentData.replyUser.id) : "0";
+    const parentId = commentData.parent_id ? String(commentData.parent_id) : "0";
+
     return {
-        id: commentData.id || 0,
+        id: commentId,
         content: commentData.content || '',
         user: {
-            id: commentData.user?.id || 0,
+            id: userId,
             name: commentData.user?.name || '用户',
             avatar: commentData.user?.avatar || '/default-avatar.png'
         },
         replyUser: commentData.replyUser ? {
-            id: commentData.replyUser.id || 0,
+            id: replyUserId,
             name: commentData.replyUser.name || '用户'
         } : null,
         likeCount: commentData.likeCount || 0,
@@ -87,6 +126,7 @@ export const formatCommentData = (commentData) => {
         isLiked: commentData.isLiked || false,
         isDisliked: commentData.isDisliked || false,
         date: formatRelativeTime(commentData.created_at || commentData.date),
+        parentId: parentId,
         comments: commentData.comments ? commentData.comments.map(formatCommentData) : [],
         replyCount: commentData.replyCount || 0
     };
@@ -98,68 +138,18 @@ export const formatCommentData = (commentData) => {
 export const formatRelativeTime = (date) => {
     if (!date) return '刚刚';
 
-    const now = new Date();
-    const targetDate = new Date(date);
-    const diffInSeconds = Math.floor((now - targetDate) / 1000);
+    try {
+        const now = new Date();
+        const targetDate = new Date(date);
+        const diffInSeconds = Math.floor((now - targetDate) / 1000);
 
-    if (diffInSeconds < 60) return '刚刚';
-    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}分钟前`;
-    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}小时前`;
-    if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 86400)}天前`;
-    if (diffInSeconds < 31536000) return `${Math.floor(diffInSeconds / 2592000)}个月前`;
-    return `${Math.floor(diffInSeconds / 31536000)}年前`;
-};
-
-/**
- * 构建评论树
- */
-export const buildCommentTree = (comments) => {
-    if (!Array.isArray(comments)) return [];
-
-    const commentMap = new Map();
-    const rootComments = [];
-
-    comments.forEach(comment => {
-        commentMap.set(comment.id, {
-            ...comment,
-            children: []
-        });
-    });
-
-    commentMap.forEach(comment => {
-        if (comment.parentId === 0) {
-            rootComments.push(comment);
-        } else {
-            const parent = commentMap.get(comment.parentId);
-            if (parent) {
-                parent.children.push(comment);
-                parent.children.sort((a, b) => new Date(a.date) - new Date(b.date));
-            }
-        }
-    });
-
-    rootComments.sort((a, b) => new Date(b.date) - new Date(a.date));
-    return rootComments;
-};
-
-
-export const formatCollectionData = (collection) => {
-    return {
-        id: parseInt(collection.id) || 0,
-        userId: parseInt(collection.user_id) || 0,
-        name: collection.name || '',
-        description: collection.description || '',
-        videoCount: collection.videoCount || 0,
-        createdAt: collection.created_at || '',
-        updatedAt: collection.updated_at || ''
-    };
-};
-
-export const formatVideoCollectionData = (video) => {
-    const baseVideo = formatVideoData(video);
-    return {
-        ...baseVideo,
-        isCollected: video.isCollected || false,
-        collectedCount: parseInt(video.collectedCount) || 0
-    };
+        if (diffInSeconds < 60) return '刚刚';
+        if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}分钟前`;
+        if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}小时前`;
+        if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 86400)}天前`;
+        if (diffInSeconds < 31536000) return `${Math.floor(diffInSeconds / 2592000)}个月前`;
+        return `${Math.floor(diffInSeconds / 31536000)}年前`;
+    } catch (error) {
+        return date;
+    }
 };

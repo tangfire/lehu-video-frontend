@@ -10,80 +10,81 @@ export const webSocketAPI = {
         websocketManager.disconnect();
     },
 
+    // 发送消息
     sendMessage: (messageData) => {
         return websocketManager.sendMessage(messageData);
     },
 
+    // 发送输入状态
     sendTypingStatus: (receiverId, convType, isTyping, text = '') => {
-        return websocketManager.send({
-            action: 'typing',
-            data: {
-                receiver_id: receiverId,
-                conv_type: convType,
-                is_typing: isTyping,
-                text
-            },
-            timestamp: Date.now()
-        });
+        return websocketManager.sendTypingStatus(receiverId, convType, isTyping, text);
     },
 
+    // 发送已读回执
     sendReadReceipt: (conversationId, messageId) => {
-        return websocketManager.send({
-            action: 'read_message',
-            data: {
-                conversation_id: conversationId,
-                message_id: messageId
-            },
-            timestamp: Date.now()
-        });
+        return websocketManager.sendReadReceipt(conversationId, messageId);
     },
 
+    // 撤回消息
     recallMessage: (messageId) => {
-        return websocketManager.send({
-            action: 'recall_message',
-            data: { message_id: messageId },
-            timestamp: Date.now()
-        });
+        return websocketManager.recallMessage(messageId);
     },
 
-    // 事件监听器 - 添加 message_sent 监听
+    // 监听新消息
     onMessage: (callback) => {
         websocketManager.on('new_message', callback);
     },
 
-    // 添加 message_sent 监听
+    // 监听消息发送成功
     onMessageSent: (callback) => {
         websocketManager.on('message_sent', callback);
     },
 
-    // 添加 message_delivered 监听
+    // 监听消息已送达
     onMessageDelivered: (callback) => {
         websocketManager.on('message_delivered', callback);
     },
 
+    // 监听消息已读
     onMessageRead: (callback) => {
         websocketManager.on('message_read', callback);
     },
 
+    // 监听消息撤回
+    onMessageRecalled: (callback) => {
+        websocketManager.on('message_recalled', callback);
+    },
+
+    // 监听用户正在输入
     onTyping: (callback) => {
         websocketManager.on('user_typing', callback);
     },
 
+    // 监听通知
     onNotification: (callback) => {
         websocketManager.on('notification', callback);
     },
 
+    // 监听认证成功
     onAuthSuccess: (callback) => {
         websocketManager.on('auth_success', callback);
     },
 
+    // 监听连接状态 - 简化版本
     onConnectionStatus: (callback) => {
+        websocketManager.on('connection_status', callback);
         websocketManager.on('connection_established', () => callback('connected'));
-        websocketManager.on('connection_lost', () => callback('disconnected'));
         websocketManager.on('connection_error', () => callback('error'));
+
+        // 返回清理函数
+        return () => {
+            websocketManager.off('connection_status', callback);
+            websocketManager.off('connection_established', () => callback('connected'));
+            websocketManager.off('connection_error', () => callback('error'));
+        };
     },
 
-    // 添加移除监听的方法
+    // 移除监听器方法
     offMessage: (callback) => {
         websocketManager.off('new_message', callback);
     },
@@ -96,10 +97,32 @@ export const webSocketAPI = {
         websocketManager.off('message_delivered', callback);
     },
 
+    offMessageRead: (callback) => {
+        websocketManager.off('message_read', callback);
+    },
+
+    offMessageRecalled: (callback) => {
+        websocketManager.off('message_recalled', callback);
+    },
+
     offTyping: (callback) => {
         websocketManager.off('user_typing', callback);
     },
 
+    offNotification: (callback) => {
+        websocketManager.off('notification', callback);
+    },
+
+    offAuthSuccess: (callback) => {
+        websocketManager.off('auth_success', callback);
+    },
+
+    offConnectionStatus: (callback) => {
+        // 简化处理
+        websocketManager.off('connection_status', callback);
+    },
+
+    // 连接状态检查
     isConnected: () => {
         return websocketManager.isConnected();
     },

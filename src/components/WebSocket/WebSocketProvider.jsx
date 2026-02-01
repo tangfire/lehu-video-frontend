@@ -1,4 +1,3 @@
-// WebSocketProvider.jsx 的修改
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { webSocketAPI } from '../../api/websocket';
 import { getCurrentUser } from '../../api/user';
@@ -18,13 +17,13 @@ export const WebSocketProvider = ({ children }) => {
     const [unreadCount, setUnreadCount] = useState(0);
     const [notifications, setNotifications] = useState([]);
     const [typingUsers, setTypingUsers] = useState(new Map());
-    const [messageStatusUpdates, setMessageStatusUpdates] = useState(new Map()); // 存储消息状态更新
+    const [messageStatusUpdates, setMessageStatusUpdates] = useState(new Map());
 
     const handleNewMessage = useCallback((message) => {
         console.log('收到新消息:', message);
 
         const user = getCurrentUser();
-        if (user && message.sender_id !== user.id) {
+        if (user && String(message.sender_id) !== String(user.id)) {
             setUnreadCount(prev => prev + 1);
         }
 
@@ -41,103 +40,122 @@ export const WebSocketProvider = ({ children }) => {
         setNotifications(prev => [newNotification, ...prev.slice(0, 9)]);
     }, []);
 
-    // 处理消息发送成功
-    // 处理消息发送成功回执
-    const handleMessageSent = useCallback((response) => {
-        console.log('收到发送确认:', response);
+    // 处理消息发送成功 - 修复：正确处理发送成功事件
+    const handleMessageSent = useCallback((data) => {
+        console.log('收到发送确认:', data);
 
-        // 根据你提供的日志，数据在 response.data 里面
-        const info = response.data || {};
+        const info = data.data || data;
         const serverId = info.message_id ? String(info.message_id) : null;
-        const clientId = info.client_msg_id || response.client_msg_id;
+        const clientId = info.client_msg_id || data.client_msg_id;
+
+        console.log('发送确认信息:', { serverId, clientId, info });
+
+        if (!serverId && !clientId) return;
 
         setMessageStatusUpdates(prev => {
             const newMap = new Map(prev);
+
             const updateObj = {
-                messageId: serverId,
+                message_id: serverId,
+                client_msg_id: clientId,
                 status: 1, // SENT
                 timestamp: Date.now()
             };
 
-            // 使用 client_msg_id 作为 Key，因为这是 React 初始存的 ID
-            if (clientId) newMap.set(String(clientId), updateObj);
-            // 同时也存一份以 serverId 为 Key 的，方便后续处理 read_receipt
-            if (serverId) newMap.set(serverId, updateObj);
+            // 🔥 用 client_msg_id 做升级 key（最重要）
+            if (clientId) {
+                newMap.set(String(clientId), updateObj);
+            }
 
+            // 🔁 同时也用 serverId，方便后续 delivered/read
+            if (serverId) {
+                newMap.set(String(serverId), updateObj);
+            }
+
+            console.log('更新 messageStatusUpdates:', newMap);
             return newMap;
         });
     }, []);
 
-    // 处理消息已送达
+
+    // 处理消息已送达 - 修复：确保正确更新状态
     const handleMessageDelivered = useCallback((data) => {
         console.log('消息已送达:', data);
 
-        // 更新消息状态为已送达 (2)
-        setMessageStatusUpdates(prev => {
-            const newMap = new Map(prev);
-            const key = `${data.message_id}`;
+        const info = data.data || data;
+        const messageId = info.message_id ? String(info.message_id) : null;
 
-            newMap.set(key, {
-                messageId: data.message_id,
-                status: 2, // DELIVERED
-                receiverId: data.receiver_id,
-                timestamp: Date.now()
+        if (messageId) {
+            setMessageStatusUpdates(prev => {
+                const newMap = new Map(prev);
+                newMap.set(messageId, {
+                    messageId: messageId,
+                    status: 2, // DELIVERED
+                    receiverId: info.receiver_id ? String(info.receiver_id) : null,
+                    timestamp: Date.now()
+                });
+
+                console.log('消息已送达更新:', newMap);
+                return newMap;
             });
-
-            return newMap;
-        });
+        }
     }, []);
 
     // 处理消息已读
     const handleMessageRead = useCallback((data) => {
         console.log('消息已读:', data);
 
-        // 更新消息状态为已读 (3)
-        setMessageStatusUpdates(prev => {
-            const newMap = new Map(prev);
-            const key = `${data.message_id}`;
+        const info = data.data || data;
+        const messageId = info.message_id ? String(info.message_id) : null;
 
-            newMap.set(key, {
-                messageId: data.message_id,
-                status: 3, // READ
-                readerId: data.reader_id,
-                timestamp: Date.now()
+        if (messageId) {
+            setMessageStatusUpdates(prev => {
+                const newMap = new Map(prev);
+                newMap.set(messageId, {
+                    messageId: messageId,
+                    status: 3, // READ
+                    readerId: info.reader_id ? String(info.reader_id) : null,
+                    timestamp: Date.now()
+                });
+
+                return newMap;
             });
-
-            return newMap;
-        });
+        }
     }, []);
 
     // 处理消息撤回
     const handleMessageRecalled = useCallback((data) => {
         console.log('消息已撤回:', data);
 
-        // 更新消息状态为已撤回 (4)
-        setMessageStatusUpdates(prev => {
-            const newMap = new Map(prev);
-            const key = `${data.message_id}`;
+        const info = data.data || data;
+        const messageId = info.message_id ? String(info.message_id) : null;
 
-            newMap.set(key, {
-                messageId: data.message_id,
-                status: 4, // RECALLED
-                recalledBy: data.recalled_by,
-                timestamp: Date.now()
+        if (messageId) {
+            setMessageStatusUpdates(prev => {
+                const newMap = new Map(prev);
+                newMap.set(messageId, {
+                    messageId: messageId,
+                    status: 4, // RECALLED
+                    recalledBy: info.recalled_by ? String(info.recalled_by) : null,
+                    timestamp: Date.now()
+                });
+
+                return newMap;
             });
-
-            return newMap;
-        });
+        }
     }, []);
 
     const handleTyping = useCallback((data) => {
-        const { sender_id, receiver_id, is_typing, text } = data;
+        const info = data.data || data;
+        const { sender_id, receiver_id, is_typing, text } = info;
 
         setTypingUsers(prev => {
             const newMap = new Map(prev);
-            const key = `${sender_id}_${receiver_id}`;
+            const key = `${String(sender_id)}_${String(receiver_id)}`;
 
             if (is_typing) {
                 newMap.set(key, {
-                    userId: sender_id,
+                    userId: String(sender_id),
                     isTyping: true,
                     text,
                     timestamp: Date.now()
@@ -153,6 +171,11 @@ export const WebSocketProvider = ({ children }) => {
     const handleNotification = useCallback((notification) => {
         console.log('收到通知:', notification);
         setNotifications(prev => [notification, ...prev.slice(0, 9)]);
+    }, []);
+
+    const handleConnectionStatus = useCallback((status) => {
+        console.log('WebSocket连接状态更新:', status);
+        setConnectionStatus(status);
     }, []);
 
     const connectWebSocket = useCallback(() => {
@@ -171,23 +194,14 @@ export const WebSocketProvider = ({ children }) => {
         }
     }, []);
 
-    // 获取消息状态更新
-    // 获取状态的方法也要强制转 String
+    // 获取消息状态更新 - 强制转 String
     const getMessageStatusUpdate = useCallback((id) => {
         return messageStatusUpdates.get(String(id));
     }, [messageStatusUpdates]);
 
-    // ... 其他 handle 保持一致的 String 转换逻辑 ...
-
-    // 记得在 useEffect 里正确绑定 handleMessageSent
-    useEffect(() => {
-        webSocketAPI.onMessageSent(handleMessageSent);
-        // ...
-    }, [handleMessageSent]);
-
     // 清除消息状态更新
     const clearMessageStatusUpdate = useCallback((messageId, clientMsgId) => {
-        const key = clientMsgId || messageId;
+        const key = String(clientMsgId || messageId);
         setMessageStatusUpdates(prev => {
             const newMap = new Map(prev);
             newMap.delete(key);
@@ -196,18 +210,19 @@ export const WebSocketProvider = ({ children }) => {
     }, []);
 
     useEffect(() => {
+        console.log('messageStatusUpdates 更新:', messageStatusUpdates);
+    }, [messageStatusUpdates]);
+
+    useEffect(() => {
         // 监听连接状态
-        webSocketAPI.onConnectionStatus((status) => {
-            setConnectionStatus(status);
-            console.log('WebSocket连接状态:', status);
-        });
+        const cleanupConnectionStatus = webSocketAPI.onConnectionStatus(handleConnectionStatus);
 
         // 监听消息相关事件
         webSocketAPI.onMessage(handleNewMessage);
         webSocketAPI.onMessageSent(handleMessageSent);
         webSocketAPI.onMessageDelivered(handleMessageDelivered);
         webSocketAPI.onMessageRead(handleMessageRead);
-        webSocketAPI.onMessageRecalled?.(handleMessageRecalled);
+        webSocketAPI.onMessageRecalled(handleMessageRecalled);
         webSocketAPI.onTyping(handleTyping);
         webSocketAPI.onNotification(handleNotification);
 
@@ -241,14 +256,25 @@ export const WebSocketProvider = ({ children }) => {
 
         return () => {
             webSocketAPI.disconnect();
+
+            // 清理所有事件监听器
+            if (cleanupConnectionStatus && typeof cleanupConnectionStatus === 'function') {
+                cleanupConnectionStatus();
+            }
+
             webSocketAPI.offMessage(handleNewMessage);
-            webSocketAPI.offMessageSent?.(handleMessageSent);
-            webSocketAPI.offMessageDelivered?.(handleMessageDelivered);
-            webSocketAPI.offMessageRead?.(handleMessageRead);
-            webSocketAPI.offTyping?.(handleTyping);
+            webSocketAPI.offMessageSent(handleMessageSent);
+            webSocketAPI.offMessageDelivered(handleMessageDelivered);
+            webSocketAPI.offMessageRead(handleMessageRead);
+            webSocketAPI.offMessageRecalled(handleMessageRecalled);
+            webSocketAPI.offTyping(handleTyping);
+            webSocketAPI.offNotification(handleNotification);
+
             window.removeEventListener('storage', handleStorageChange);
         };
-    }, [connectWebSocket, handleNewMessage, handleMessageSent, handleMessageDelivered, handleMessageRead, handleMessageRecalled, handleTyping, handleNotification]);
+    }, [connectWebSocket, handleNewMessage, handleMessageSent, handleMessageDelivered,
+        handleMessageRead, handleMessageRecalled, handleTyping, handleNotification,
+        handleConnectionStatus]);
 
     const sendMessage = useCallback((messageData) => {
         return webSocketAPI.sendMessage(messageData);
@@ -292,11 +318,11 @@ export const WebSocketProvider = ({ children }) => {
             setUnreadCount(0);
         }, []),
         isTyping: useCallback((userId, conversationId) => {
-            const key = `${userId}_${conversationId}`;
+            const key = `${String(userId)}_${String(conversationId)}`;
             const typingData = typingUsers.get(key);
             return typingData ? typingData.isTyping : false;
         }, [typingUsers]),
-        isConnected: webSocketAPI.isConnected,
+        isConnected: () => webSocketAPI.isConnected(),
         reconnect: connectWebSocket
     };
 

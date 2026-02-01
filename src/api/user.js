@@ -89,7 +89,7 @@ export const saveUserData = (token, userInfo) => {
 
     // 确保userInfo是对象且包含id，将mobile转为字符串
     const userData = {
-        id: userInfo.id || userInfo.user_id || 0,
+        id: userInfo.id || userInfo.user_id || "0",
         name: userInfo.name || '',
         avatar: userInfo.avatar || '',
         background_image: userInfo.background_image || '',

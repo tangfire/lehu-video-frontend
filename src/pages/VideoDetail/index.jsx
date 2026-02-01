@@ -92,7 +92,7 @@ const VideoDetail = () => {
 
     const loadMockVideo = () => {
         const mockVideo = {
-            id: parseInt(id) || 1,
+            id: id || "1",
             title: '演示视频：美丽的风景',
             description: '这是一个演示视频，展示了美丽的风景。实际视频数据将从服务器获取。',
             author: '系统演示',

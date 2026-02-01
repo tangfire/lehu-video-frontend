@@ -1,3 +1,4 @@
+// src/components/Comment/CommentList.jsx
 import React, { useState, useEffect, forwardRef, useImperativeHandle, useCallback } from 'react';
 import { getCurrentUser } from '../../api/user';
 import { commentApi, formatCommentData, buildCommentTree } from '../../api/comment';
@@ -43,115 +44,71 @@ const CommentList = forwardRef(({
 
             console.log('评论API响应:', response);
 
-            if (response) {
+            if (response && response.comments) {
                 let commentList = [];
+                let total = 0;
 
-                // 处理不同的响应格式
-                if (Array.isArray(response)) {
-                    commentList = response;
-                } else if (response.comments && Array.isArray(response.comments)) {
+                // 根据后端返回格式处理
+                if (response.comments && Array.isArray(response.comments)) {
                     commentList = response.comments;
-                } else if (response.list && Array.isArray(response.list)) {
-                    commentList = response.list;
+                } else if (response.data && response.data.comments && Array.isArray(response.data.comments)) {
+                    commentList = response.data.comments;
                 }
 
-                // 格式化评论数据
-                const formattedComments = commentList.map(formatCommentData);
+                // 处理分页信息
+                if (response.page_stats) {
+                    total = response.page_stats.total || commentList.length;
+                } else if (response.data && response.data.page_stats) {
+                    total = response.data.page_stats.total || commentList.length;
+                } else if (response.total) {
+                    total = response.total;
+                } else {
+                    total = commentList.length;
+                }
+
+                // 检查后端是否返回嵌套结构
+                const hasNestedComments = commentList.some(comment =>
+                    comment.comments && Array.isArray(comment.comments) && comment.comments.length > 0
+                );
+
+                let formattedComments;
+
+                if (hasNestedComments) {
+                    // 后端已经返回了嵌套结构，直接格式化
+                    console.log('后端返回了嵌套评论结构');
+                    formattedComments = commentList.map(comment => formatCommentData(comment));
+                } else {
+                    // 后端返回平铺结构，需要构建树形结构
+                    console.log('后端返回平铺结构，需要构建树形结构');
+                    formattedComments = buildCommentTree(commentList);
+                }
+
                 console.log('格式化后的评论:', formattedComments);
 
-                // 构建评论树
-                const commentTree = buildCommentTree(formattedComments);
-                console.log('构建的评论树:', commentTree);
-
                 if (pageNum === 1) {
-                    setComments(commentTree);
+                    setComments(formattedComments);
                 } else {
-                    setComments(prev => [...prev, ...commentTree]);
+                    setComments(prev => [...prev, ...formattedComments]);
                 }
 
                 // 更新分页信息
-                const total = response.total || response.count || commentList.length;
                 const loadedCount = pageNum * 20;
                 setTotalCount(total);
-                setHasMore(commentTree.length >= 20 || loadedCount < total);
+                setHasMore(formattedComments.length >= 20 || loadedCount < total);
             } else {
                 console.warn('没有获取到评论数据');
                 setComments([]);
                 setHasMore(false);
+                setTotalCount(0);
             }
 
             setPage(pageNum);
         } catch (error) {
             console.error('加载评论失败:', error);
             setError(`加载评论失败: ${error.message || '未知错误'}`);
-
-            // 加载模拟数据作为备选
-            if (pageNum === 1) {
-                loadMockComments();
-            }
         } finally {
             setLoading(false);
         }
-    };
-
-    const loadMockComments = () => {
-        console.log('加载模拟评论数据');
-        const mockComments = [
-            {
-                id: 1,
-                content: '这个视频真不错，学到了很多！',
-                date: '2小时前',
-                likeCount: 45,
-                dislikeCount: 2,
-                isLiked: false,
-                isDisliked: false,
-                user: {
-                    id: 101,
-                    name: '用户A',
-                    avatar: '/default-avatar.png'
-                },
-                comments: [
-                    {
-                        id: 11,
-                        content: '我也这么觉得！',
-                        date: '1小时前',
-                        likeCount: 12,
-                        dislikeCount: 0,
-                        isLiked: false,
-                        isDisliked: false,
-                        user: {
-                            id: 102,
-                            name: '用户B',
-                            avatar: '/default-avatar.png'
-                        },
-                        replyUser: {
-                            id: 101,
-                            name: '用户A'
-                        },
-                        comments: []
-                    }
-                ]
-            },
-            {
-                id: 2,
-                content: '感谢分享，期待更多内容！',
-                date: '3小时前',
-                likeCount: 23,
-                dislikeCount: 1,
-                isLiked: true,
-                isDisliked: false,
-                user: {
-                    id: 103,
-                    name: '用户C',
-                    avatar: '/default-avatar.png'
-                },
-                comments: []
-            }
-        ];
-
-        setComments(mockComments);
-        setTotalCount(mockComments.length);
-        setHasMore(false);
     };
 
     useImperativeHandle(ref, () => ({
@@ -188,21 +145,32 @@ const CommentList = forwardRef(({
                 replyUserId: replyToComment?.user?.id || 0
             });
 
-            if (response) {
-                const newReply = formatCommentData(response);
+            if (response && response.comment) {
+                const newReply = formatCommentData(response.comment);
 
-                setComments(prev =>
-                    prev.map(comment => {
-                        if (comment.id === commentId) {
+                // 递归查找并添加回复到对应的评论
+                const addReplyToComment = (commentsList, targetId, reply) => {
+                    return commentsList.map(comment => {
+                        if (comment.id === String(targetId)) {
                             return {
                                 ...comment,
-                                comments: [...(comment.comments || []), newReply]
+                                comments: [...(comment.comments || []), newReply],
+                                replyCount: (comment.replyCount || 0) + 1
                             };
                         }
-                        return comment;
-                    })
-                );
 
+                        if (comment.comments && comment.comments.length > 0) {
+                            return {
+                                ...comment,
+                                comments: addReplyToComment(comment.comments, targetId, reply)
+                            };
+                        }
+
+                        return comment;
+                    });
+                };
+
+                setComments(prev => addReplyToComment(prev, commentId, newReply));
                 setShowReplyInput(null);
                 setReplyContent('');
                 setReplyToComment(null);
@@ -233,20 +201,32 @@ const CommentList = forwardRef(({
                 }
 
                 if (response) {
-                    setComments(prev =>
-                        prev.map(comment =>
-                            updateCommentState(comment, commentId, {
-                                isLiked: !isLiked,
-                                isDisliked: false,
-                                likeCount: isLiked
-                                    ? Math.max(0, (comment.likeCount || 0) - 1)
-                                    : (comment.likeCount || 0) + 1,
-                                dislikeCount: comment.isDisliked
-                                    ? Math.max(0, (comment.dislikeCount || 0) - 1)
-                                    : comment.dislikeCount
-                            })
-                        )
-                    );
+                    // 递归更新评论点赞状态
+                    const updateCommentLikeState = (commentsList) => {
+                        return commentsList.map(comment => {
+                            if (comment.id === commentId) {
+                                return {
+                                    ...comment,
+                                    isLiked: !isLiked,
+                                    isDisliked: false,
+                                    likeCount: isLiked
+                                        ? Math.max(0, (comment.likeCount || 0) - 1)
+                                        : (comment.likeCount || 0) + 1
+                                };
+                            }
+
+                            if (comment.comments && comment.comments.length > 0) {
+                                return {
+                                    ...comment,
+                                    comments: updateCommentLikeState(comment.comments)
+                                };
+                            }
+
+                            return comment;
+                        });
+                    };
+
+                    setComments(prev => updateCommentLikeState(prev));
                 }
             } catch (error) {
                 console.error('评论点赞操作失败:', error);
@@ -273,20 +253,32 @@ const CommentList = forwardRef(({
                 }
 
                 if (response) {
-                    setComments(prev =>
-                        prev.map(comment =>
-                            updateCommentState(comment, commentId, {
-                                isLiked: false,
-                                isDisliked: !isDisliked,
-                                likeCount: comment.isLiked
-                                    ? Math.max(0, (comment.likeCount || 0) - 1)
-                                    : comment.likeCount,
-                                dislikeCount: isDisliked
-                                    ? Math.max(0, (comment.dislikeCount || 0) - 1)
-                                    : (comment.dislikeCount || 0) + 1
-                            })
-                        )
-                    );
+                    // 递归更新评论点踩状态
+                    const updateCommentDislikeState = (commentsList) => {
+                        return commentsList.map(comment => {
+                            if (comment.id === commentId) {
+                                return {
+                                    ...comment,
+                                    isLiked: false,
+                                    isDisliked: !isDisliked,
+                                    dislikeCount: isDisliked
+                                        ? Math.max(0, (comment.dislikeCount || 0) - 1)
+                                        : (comment.dislikeCount || 0) + 1
+                                };
+                            }
+
+                            if (comment.comments && comment.comments.length > 0) {
+                                return {
+                                    ...comment,
+                                    comments: updateCommentDislikeState(comment.comments)
+                                };
+                            }
+
+                            return comment;
+                        });
+                    };
+
+                    setComments(prev => updateCommentDislikeState(prev));
                 }
             } catch (error) {
                 console.error('评论点踩操作失败:', error);
@@ -296,49 +288,31 @@ const CommentList = forwardRef(({
         [currentUser]
     );
 
-    const updateCommentState = (comment, targetId, newState) => {
-        if (comment.id === targetId) {
-            return {
-                ...comment,
-                ...newState
-            };
-        }
-
-        if (comment.comments && comment.comments.length > 0) {
-            return {
-                ...comment,
-                comments: comment.comments.map(child =>
-                    updateCommentState(child, targetId, newState)
-                )
-            };
-        }
-
-        return comment;
-    };
-
     const handleDelete = async (commentId) => {
         if (!window.confirm('确定要删除这条评论吗？')) return;
 
         try {
             await commentApi.deleteComment(commentId);
-            setComments(prev => removeComment(prev, commentId));
+
+            // 递归删除评论
+            const removeComment = (commentsList) => {
+                return commentsList.filter(comment => {
+                    if (comment.id === commentId) return false;
+
+                    if (comment.comments && comment.comments.length > 0) {
+                        comment.comments = removeComment(comment.comments);
+                    }
+
+                    return true;
+                });
+            };
+
+            setComments(prev => removeComment(prev));
             setTotalCount(prev => prev - 1);
         } catch (error) {
             console.error('删除评论失败:', error);
             setError('删除评论失败，请稍后重试');
         }
-    };
-
-    const removeComment = (commentsList, targetId) => {
-        return commentsList.filter(comment => {
-            if (comment.id === targetId) return false;
-
-            if (comment.comments && comment.comments.length > 0) {
-                comment.comments = removeComment(comment.comments, targetId);
-            }
-
-            return true;
-        });
     };
 
     if (error) {

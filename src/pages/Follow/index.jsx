@@ -54,7 +54,7 @@ const FollowPage = () => {
 
             <div className="follow-content">
                 <FollowList
-                    userId={parseInt(userId)}
+                    userId={userId}
                     type={activeType}
                     showTitle={false}
                 />
