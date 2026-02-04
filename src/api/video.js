@@ -5,7 +5,6 @@ import { ensureInt64Fields } from '../utils/dataFormat';
 export const videoApi = {
     // 获取视频详情
     getVideoById: (id) => {
-        // id已经是字符串，不需要转换
         return request.get(`/video/${id}`);
     },
 
@@ -30,11 +29,11 @@ export const videoApi = {
         return request.post('/video/list', processedData);
     },
 
-    // 上传视频预签名
+    // 上传视频预签名 - 添加application/json头
     preSign4UploadVideo: (data) => {
         const processedData = ensureInt64Fields({
             hash: data.hash,
-            file_type: data.fileType || 'mp4',
+            file_type: data.file_type || 'mp4', // 注意：字段名改为 file_type
             size: data.size,
             filename: data.filename
         });
@@ -45,7 +44,7 @@ export const videoApi = {
     preSign4UploadCover: (data) => {
         const processedData = ensureInt64Fields({
             hash: data.hash,
-            file_type: data.fileType || 'png',
+            file_type: data.file_type || 'png', // 注意：字段名改为 file_type
             size: data.size,
             filename: data.filename
         });
@@ -64,8 +63,12 @@ export const videoApi = {
         return request.post('/video/finish', processedData);
     },
 
-    // 通用确认上传完成
+    // 通用确认上传完成 - 添加application/json头
     reportFinishUpload: (fileId) => {
-        return request.post(`/file/${fileId}/finish`);
+        return request.post(`/file/${fileId}/finish`, {}, {
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
     }
 };

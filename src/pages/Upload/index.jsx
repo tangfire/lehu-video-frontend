@@ -190,7 +190,7 @@ const Upload = () => {
 
             const videoPreSignResp = await videoApi.preSign4UploadVideo({
                 hash: videoHash,
-                file_type: 'mp4',
+                file_type: videoFile.type.split('/')[1] || 'mp4', // 从文件类型提取扩展名
                 size: videoFile.size,
                 filename: videoFile.name
             });
@@ -228,7 +228,7 @@ const Upload = () => {
 
                     const coverPreSignResp = await videoApi.preSign4UploadCover({
                         hash: coverHash,
-                        file_type: 'png',
+                        file_type: coverFile.type.split('/')[1] || 'png', // 从文件类型提取扩展名
                         size: coverFile.size,
                         filename: coverFile.name
                     });

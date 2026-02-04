@@ -214,6 +214,24 @@ class WebSocketManager {
                     recalled_by: String(rest.data.recalled_by)
                 });
                 break;
+            case 'not_friend':  // 新增处理
+                // 处理不同可能的数据结构
+                { const notFriendData = rest.data || rest;
+
+                // 确保我们有 client_msg_id
+                const clientMsgId = notFriendData.client_msg_id ||
+                    notFriendData.message_id ||
+                    (notFriendData.data && notFriendData.data.client_msg_id);
+
+                this.emit('not_friend', {
+                    ...notFriendData,
+                    // 确保 ID 是字符串
+                    client_msg_id: clientMsgId ? String(clientMsgId) : null,
+                    sender_id: notFriendData.sender_id ? String(notFriendData.sender_id) : null,
+                    receiver_id: notFriendData.receiver_id ? String(notFriendData.receiver_id) : null,
+                    error: notFriendData.error || notFriendData.message || '双方不是好友关系'
+                });
+                break; }
             case 'user_typing':
                 this.emit('user_typing', {
                     ...rest.data,

@@ -29,6 +29,7 @@ const Header = () => {
     const [messageUnreadCount, setMessageUnreadCount] = useState(0);
     const navigate = useNavigate();
     const location = useLocation();
+    const [showMobileSearch, setShowMobileSearch] = useState(false);
 
     // 使用 ref 来存储 dropdown 元素
     const dropdownRef = useRef(null);
@@ -106,13 +107,17 @@ const Header = () => {
             <div className="header-container">
                 {/* Logo */}
                 <Link to="/" className="logo">
-                    <IoSparkles className="logo-icon" />
+                    <IoSparkles className="logo-icon"/>
                     <span className="logo-text">ShortVideo</span>
                 </Link>
 
                 {/* 搜索框 - 桌面端 */}
-                <form className="search-box" onSubmit={handleSearch}>
-                    <FiSearch className="search-icon" />
+                <form
+                    className={`search-box ${showMobileSearch ? 'mobile-active' : ''}`}
+                    onSubmit={handleSearch}
+                    onBlur={() => setShowMobileSearch(false)}
+                >
+                    <FiSearch className="search-icon"/>
                     <input
                         type="text"
                         placeholder="搜索视频、用户..."
@@ -129,7 +134,7 @@ const Header = () => {
                         className="mobile-close-btn"
                         onClick={() => setShowMobileMenu(false)}
                     >
-                        <FiX />
+                        <FiX/>
                     </button>
 
                     <Link
@@ -137,7 +142,7 @@ const Header = () => {
                         className={`nav-link ${location.pathname === '/' ? 'active' : ''}`}
                         onClick={() => setShowMobileMenu(false)}
                     >
-                        <FiHome />
+                        <FiHome/>
                         <span>首页</span>
                     </Link>
 
@@ -148,10 +153,11 @@ const Header = () => {
                             className={`nav-link ${location.pathname.includes('/chat') ? 'active' : ''}`}
                             onClick={() => setShowMobileMenu(false)}
                         >
-                            <FiMessageCircle />
+                            <FiMessageCircle/>
                             <span>消息</span>
                             {messageUnreadCount > 0 && (
-                                <span className="notification-badge">{messageUnreadCount > 99 ? '99+' : messageUnreadCount}</span>
+                                <span
+                                    className="notification-badge">{messageUnreadCount > 99 ? '99+' : messageUnreadCount}</span>
                             )}
                         </Link>
                     )}
@@ -163,12 +169,12 @@ const Header = () => {
                                 className="nav-link upload-btn"
                                 onClick={() => setShowMobileMenu(false)}
                             >
-                                <FiUpload />
+                                <FiUpload/>
                                 <span>上传</span>
                             </Link>
 
                             <button className="nav-link notification-btn">
-                                <FiBell />
+                                <FiBell/>
                                 <span className="notification-badge">3</span>
                             </button>
 
@@ -214,7 +220,7 @@ const Header = () => {
                                                 setShowMobileMenu(false);
                                             }}
                                         >
-                                            <FiUser />
+                                            <FiUser/>
                                             <span>个人中心</span>
                                         </Link>
 
@@ -226,7 +232,7 @@ const Header = () => {
                                                 setShowMobileMenu(false);
                                             }}
                                         >
-                                            <FiUsers />
+                                            <FiUsers/>
                                             <span>我的关注</span>
                                         </Link>
 
@@ -238,7 +244,7 @@ const Header = () => {
                                                 setShowMobileMenu(false);
                                             }}
                                         >
-                                            <FiUsers />
+                                            <FiUsers/>
                                             <span>我的好友</span>
                                         </Link>
 
@@ -250,7 +256,7 @@ const Header = () => {
                                                 setShowMobileMenu(false);
                                             }}
                                         >
-                                            <FiUsers />
+                                            <FiUsers/>
                                             <span>我的群聊</span>
                                         </Link>
 
@@ -262,7 +268,7 @@ const Header = () => {
                                                 setShowMobileMenu(false);
                                             }}
                                         >
-                                            <FiBookmark />
+                                            <FiBookmark/>
                                             <span>我的收藏</span>
                                         </Link>
 
@@ -274,7 +280,7 @@ const Header = () => {
                                                 setShowMobileMenu(false);
                                             }}
                                         >
-                                            <FiSettings />
+                                            <FiSettings/>
                                             <span>账号设置</span>
                                         </Link>
 
@@ -287,7 +293,7 @@ const Header = () => {
                                                 handleLogout();
                                             }}
                                         >
-                                            <FiLogOut />
+                                            <FiLogOut/>
                                             <span>退出登录</span>
                                         </button>
                                     </div>
@@ -311,12 +317,15 @@ const Header = () => {
                     className="mobile-menu-btn"
                     onClick={() => setShowMobileMenu(!showMobileMenu)}
                 >
-                    {showMobileMenu ? <FiX /> : <FiMenu />}
+                    {showMobileMenu ? <FiX/> : <FiMenu/>}
                 </button>
 
                 {/* 移动端搜索按钮 */}
-                <button className="mobile-search-btn">
-                    <FiSearch />
+                <button
+                    className="mobile-search-btn"
+                    onClick={() => setShowMobileSearch(!showMobileSearch)}
+                >
+                    <FiSearch/>
                 </button>
             </div>
         </header>

@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import VideoCard from '../../components/Common/VideoCard';
 import { FiTrendingUp, FiHeart, FiMapPin } from 'react-icons/fi';
 import { IoSparkles } from 'react-icons/io5';
 import { videoApi } from '../../api/video';
 import { getCurrentUser } from '../../api/user';
-import { formatVideoData } from '../../utils/dataFormat';
 import './Home.css';
 
 const Home = () => {
@@ -14,6 +14,7 @@ const Home = () => {
     const [hasMore, setHasMore] = useState(true);
     const [nextTime, setNextTime] = useState(Math.floor(Date.now() / 1000));
     const [error, setError] = useState(null);
+    const navigate = useNavigate();
 
     const fetchVideos = async (latestTime = nextTime, isLoadMore = false) => {
         try {
@@ -24,12 +25,34 @@ const Home = () => {
 
             const response = await videoApi.feedShortVideo({
                 latest_time: latestTime,
-                user_id: user?.id || 0,
+                user_id: user?.id || "0",
                 feed_num: 10
             });
 
+            console.log('视频流响应:', response);
+
             if (response && response.videos) {
-                const mappedVideos = response.videos.map(video => formatVideoData(video));
+                const mappedVideos = response.videos.map(video => ({
+                    id: video.id,
+                    title: video.title,
+                    author: video.author?.name || '未知用户',
+                    authorId: video.author?.id,
+                    avatar: video.author?.avatar || '/default-avatar.png',
+                    views: video.views || Math.floor(Math.random() * 10000) + 1000,
+                    likes: video.favoriteCount || 0,
+                    comments: video.commentCount || 0,
+                    thumbnail: video.cover_url || 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4',
+                    duration: '2:30',
+                    uploadTime: '刚刚',
+                    tags: [],
+                    play_url: video.play_url,
+                    cover_url: video.cover_url,
+                    isFavorite: video.isFavorite || false,
+                    isCollected: video.isCollected || false,
+                    collectedCount: video.collectedCount || 0
+                }));
+
+                console.log('处理后的视频数据:', mappedVideos);
 
                 if (isLoadMore) {
                     setVideos(prev => [...prev, ...mappedVideos]);
@@ -45,6 +68,7 @@ const Home = () => {
 
                 setHasMore(response.videos.length >= 10);
             } else {
+                console.warn('视频数据格式异常:', response);
                 setHasMore(false);
             }
         } catch (error) {

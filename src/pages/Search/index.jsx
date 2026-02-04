@@ -1,9 +1,9 @@
 import React from 'react';
 import SearchUsers from '../../components/User/SearchUsers';
+import './SearchPage.css';
 
 const SearchPage = () => {
     const handleUserSelect = (user) => {
-        // 在新标签页打开用户主页
         window.open(`/user/${user.id}`, '_blank');
     };
 
@@ -14,11 +14,13 @@ const SearchPage = () => {
                 <p>查找并添加新朋友</p>
             </div>
 
-            <SearchUsers
-                onUserSelect={handleUserSelect}
-                showActions={true}
-                showAddFriend={true}
-            />
+            <div className="search-container">
+                <SearchUsers
+                    onUserSelect={handleUserSelect}
+                    showActions={true}
+                    showAddFriend={true}
+                />
+            </div>
         </div>
     );
 };

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getCurrentUser } from '../../api/user';
-import followApi from '../../api/follow';
+import {followApi} from '../../api/follow';
 import './FollowButton.css';
 
 const FollowButton = ({

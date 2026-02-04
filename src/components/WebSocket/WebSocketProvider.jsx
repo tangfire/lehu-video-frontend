@@ -19,26 +19,44 @@ export const WebSocketProvider = ({ children }) => {
     const [typingUsers, setTypingUsers] = useState(new Map());
     const [messageStatusUpdates, setMessageStatusUpdates] = useState(new Map());
 
+    // 防抖函数定义
+    const debounce = (func, wait) => {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    };
+
     const handleNewMessage = useCallback((message) => {
         console.log('收到新消息:', message);
 
+        // 触发新消息事件，让ChatRoom组件处理
+        onMessage?.(message);
+
+        // 如果是对方的消息，显示通知
         const user = getCurrentUser();
         if (user && String(message.sender_id) !== String(user.id)) {
             setUnreadCount(prev => prev + 1);
+
+            const newNotification = {
+                id: Date.now(),
+                type: 'message',
+                title: '新消息',
+                content: `收到新消息`,
+                timestamp: Date.now(),
+                read: false
+            };
+
+            setNotifications(prev => [newNotification, ...prev.slice(0, 9)]);
         }
-
-        // 显示通知
-        const newNotification = {
-            id: Date.now(),
-            type: 'message',
-            title: '新消息',
-            content: `收到来自用户 ${message.sender_id} 的消息`,
-            timestamp: Date.now(),
-            read: false
-        };
-
-        setNotifications(prev => [newNotification, ...prev.slice(0, 9)]);
     }, []);
+
+
 
     // 处理消息发送成功 - 修复：正确处理发送成功事件
     const handleMessageSent = useCallback((data) => {
@@ -122,6 +140,20 @@ export const WebSocketProvider = ({ children }) => {
             });
         }
     }, []);
+
+    const handleNotFriend = useCallback((data) => {
+        const { client_msg_id, error } = data;
+
+        setMessageStatusUpdates(prev => {
+            const newMap = new Map(prev);
+            newMap.set(String(client_msg_id), {
+                status: 99, // 发送失败
+                error
+            });
+            return newMap;
+        });
+    }, []);
+
 
     // 处理消息撤回
     const handleMessageRecalled = useCallback((data) => {
@@ -225,6 +257,8 @@ export const WebSocketProvider = ({ children }) => {
         webSocketAPI.onMessageRecalled(handleMessageRecalled);
         webSocketAPI.onTyping(handleTyping);
         webSocketAPI.onNotification(handleNotification);
+        // 添加 not_friend 监听
+        webSocketAPI.onNotFriend(handleNotFriend);
 
         // 检查用户是否登录并连接
         const checkAndConnect = () => {

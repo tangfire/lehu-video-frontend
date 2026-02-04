@@ -1,3 +1,4 @@
+
 import request from '../utils/request';
 
 // 用户API服务
@@ -7,7 +8,7 @@ export const userApi = {
         return request.post('/user/code', data);
     },
 
-    // 注册 - 根据后端实际返回调整
+    // 注册
     register: (data) => {
         return request.post('/user/register', data);
     },
@@ -19,14 +20,22 @@ export const userApi = {
 
     // 获取用户信息（用于查看其他用户信息）
     getUserInfo: (userId) => {
-        return request.get('/user/info', {
-            params: { user_id: userId }
-        });
+        return request.get(`/user/info/${userId}`);
+    },
+
+    // 批量获取用户信息
+    batchGetUserInfo: (data) => {
+        return request.post('/users/batch', data);
     },
 
     // 更新用户信息
     updateUserInfo: (data) => {
         return request.put('/user/info', data);
+    },
+
+    // 搜索用户
+    searchUsers: (data) => {
+        return request.post('/users/search', data);
     },
 
     // 绑定凭证（手机/邮箱）
@@ -64,6 +73,71 @@ export const getVoucherTypeText = (type) => {
     return type === VoucherType.PHONE ? '手机号' : '邮箱';
 };
 
+// 存储用户信息时也修复 mobile 字段
+export const saveUserData = (token, userInfo) => {
+    localStorage.setItem('token', token);
+
+    // 确保userInfo是对象且包含id，将mobile转为字符串
+    const userData = {
+        id: userInfo.id || userInfo.user_id || "0",
+        name: userInfo.name || '',
+        nickname: userInfo.nickname || '',
+        avatar: userInfo.avatar || '',
+        background_image: userInfo.background_image || '',
+        signature: userInfo.signature || '',
+        mobile: String(userInfo.mobile || ''),
+        email: userInfo.email || '',
+        gender: userInfo.gender || 0,
+        follow_count: userInfo.follow_count || 0,
+        follower_count: userInfo.follower_count || 0,
+        total_favorited: userInfo.total_favorited || 0,
+        work_count: userInfo.work_count || 0,
+        favorite_count: userInfo.favorite_count || 0,
+        created_at: userInfo.created_at || new Date().toISOString(),
+        online_status: userInfo.online_status || 0,
+        last_online_time: userInfo.last_online_time || ''
+    };
+
+    localStorage.setItem('userInfo', JSON.stringify(userData));
+    return userData;
+};
+
+/**
+ * 用户相关工具函数
+ */
+export const getCurrentUser = () => {
+    try {
+        const userInfo = localStorage.getItem('userInfo');
+        return userInfo ? JSON.parse(userInfo) : null;
+    } catch (error) {
+        console.error('获取用户信息失败:', error);
+        return null;
+    }
+};
+
+export const searchUsers =  (keyword, pageStats = { page: 1, page_size: 20 }) => {
+    return request.post('/users/search', {
+        keyword,
+        page_stats: pageStats
+    })
+};
+
+export const getUserDisplayName = (user) => {
+    if (!user) return '用户';
+    return user.nickname || user.name || user.username || '用户';
+};
+
+export const isLoggedIn = () => {
+    const token = localStorage.getItem('token');
+    const user = getCurrentUser();
+    return !!(token && user);
+};
+
+export const clearUserData = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('userInfo');
+    localStorage.removeItem('refresh_token');
+};
 
 // 更新本地存储的用户信息
 export const updateLocalUserInfo = (newUserInfo) => {
@@ -81,60 +155,55 @@ export const updateLocalUserInfo = (newUserInfo) => {
     return null;
 };
 
-
-
-// 存储用户信息时也修复 mobile 字段
-export const saveUserData = (token, userInfo) => {
-    localStorage.setItem('token', token);
-
-    // 确保userInfo是对象且包含id，将mobile转为字符串
-    const userData = {
-        id: userInfo.id || userInfo.user_id || "0",
-        name: userInfo.name || '',
-        avatar: userInfo.avatar || '',
-        background_image: userInfo.background_image || '',
-        signature: userInfo.signature || '',
-        mobile: String(userInfo.mobile || ''), // 转为字符串
-        email: userInfo.email || '',
-        follow_count: userInfo.follow_count || userInfo.followCount || 0,
-        follower_count: userInfo.follower_count || userInfo.followerCount || 0,
-        total_favorited: userInfo.total_favorited || userInfo.totalFavorited || 0,
-        work_count: userInfo.work_count || userInfo.workCount || 0,
-        favorite_count: userInfo.favorite_count || userInfo.favoriteCount || 0
-    };
-
-    localStorage.setItem('userInfo', JSON.stringify(userData));
-    return userData;
+// 获取用户头像
+export const getUserAvatar = (user) => {
+    if (!user) return '/default-avatar.png';
+    return user.avatar || '/default-avatar.png';
 };
 
+// 获取用户背景图
+export const getUserBackground = (user) => {
+    if (!user) return '/default-background.jpg';
+    return user.background_image || '/default-background.jpg';
+};
 
+// 格式化用户统计数据
+export const formatUserStats = (user) => {
+    return {
+        following: user.follow_count || 0,
+        followers: user.follower_count || 0,
+        likes: user.total_favorited || 0,
+        works: user.work_count || 0,
+        favorites: user.favorite_count || 0
+    };
+};
 
-/**
- * 用户相关API
- */
+// 检查用户是否在线
+export const isUserOnline = (user) => {
+    if (!user || !user.online_status) return false;
+    return user.online_status === 1; // 1表示在线
+};
 
-export const getCurrentUser = () => {
-    try {
-        const userInfo = localStorage.getItem('userInfo');
-        return userInfo ? JSON.parse(userInfo) : null;
-    } catch (error) {
-        console.error('获取用户信息失败:', error);
-        return null;
+// 获取用户在线状态文本
+export const getOnlineStatusText = (user) => {
+    if (!user || !user.online_status) return '离线';
+
+    switch (user.online_status) {
+        case 1: return '在线';
+        case 2: return '忙碌';
+        case 3: return '离开';
+        default: return '离线';
     }
 };
 
-export const getUserDisplayName = (user) => {
-    if (!user) return '用户';
-    return user.name || user.username || '用户';
-};
+// 获取用户在线状态颜色
+export const getOnlineStatusColor = (user) => {
+    if (!user || !user.online_status) return '#9E9E9E';
 
-export const isLoggedIn = () => {
-    const token = localStorage.getItem('token');
-    const user = getCurrentUser();
-    return !!(token && user);
-};
-
-export const clearUserData = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('userInfo');
+    switch (user.online_status) {
+        case 1: return '#4CAF50'; // 绿色
+        case 2: return '#F44336'; // 红色
+        case 3: return '#FF9800'; // 橙色
+        default: return '#9E9E9E'; // 灰色
+    }
 };

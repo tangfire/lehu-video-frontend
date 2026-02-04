@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getCurrentUser } from '../../api/user';
-import followApi from '../../api/follow';
+import {followApi} from '../../api/follow';
 import FollowButton from './FollowButton';
 import './FollowList.css';
 

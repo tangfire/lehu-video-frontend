@@ -4,7 +4,7 @@ import request from '../utils/request';
 /**
  * 关注相关API
  */
-const followApi = {
+export const followApi = {
     /**
      * 关注用户
      * @param {number} userId 要关注的用户ID
@@ -92,4 +92,3 @@ const followApi = {
     }
 };
 
-export default followApi;

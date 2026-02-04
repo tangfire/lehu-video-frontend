@@ -1,9 +1,9 @@
 import request from '../utils/request';
 
 export const friendApi = {
-    // 搜索用户 - 已改为POST请求
+    // 搜索用户（兼容旧版，实际调用 user 服务的搜索）
     searchUsers: (keyword, pageStats = { page: 1, page_size: 20 }) => {
-        return request.post('/friends/search', {
+        return request.post('/users/search', {
             keyword,
             page_stats: pageStats
         });
@@ -12,14 +12,14 @@ export const friendApi = {
     // 发送好友申请
     sendFriendApply: (receiverId, applyReason = '') => {
         return request.post('/friend/apply', {
-            receiver_id: receiverId,  // 直接传字符串
+            receiver_id: String(receiverId),
             apply_reason: applyReason
         });
     },
 
     // 处理好友申请
     handleFriendApply: (applyId, accept) => {
-        return request.put(`/friend/apply/${applyId}`, {
+        return request.put(`/friend/apply/${String(applyId)}`, {
             accept
         });
     },
@@ -42,37 +42,37 @@ export const friendApi = {
 
     // 删除好友
     deleteFriend: (friendId) => {
-        return request.delete(`/friend/${friendId}`);
+        return request.delete(`/friend/${String(friendId)}`);
     },
 
     // 更新好友备注
     updateFriendRemark: (friendId, remark) => {
-        return request.put(`/friend/${friendId}/remark`, {
+        return request.put(`/friend/${String(friendId)}/remark`, {
             remark
         });
     },
 
     // 设置好友分组
     setFriendGroup: (friendId, groupName) => {
-        return request.put(`/friend/${friendId}/group`, {
+        return request.put(`/friend/${String(friendId)}/group`, {
             group_name: groupName
         });
     },
 
     // 检查好友关系
     checkFriendRelation: (targetId) => {
-        return request.get(`/friend/${targetId}/relation`);
+        return request.get(`/friend/${String(targetId)}/relation`);
     },
 
     // 获取用户在线状态
     getUserOnlineStatus: (userId) => {
-        return request.get(`/user/${userId}/online-status`);
+        return request.get(`/user/${String(userId)}/online-status`);
     },
 
     // 批量获取用户在线状态
     batchGetUserOnlineStatus: (userIds) => {
         return request.post('/users/online-status', {
-            user_ids: userIds
+            user_ids: userIds.map(id => String(id))
         });
     }
 };

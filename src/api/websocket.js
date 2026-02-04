@@ -45,6 +45,7 @@ export const webSocketAPI = {
         websocketManager.on('message_delivered', callback);
     },
 
+
     // 监听消息已读
     onMessageRead: (callback) => {
         websocketManager.on('message_read', callback);
@@ -64,6 +65,20 @@ export const webSocketAPI = {
     onNotification: (callback) => {
         websocketManager.on('notification', callback);
     },
+
+    // 在 webSocketAPI 对象中添加以下方法：
+
+    // 监听非好友关系错误
+    onNotFriend: (callback) => {
+        websocketManager.on('not_friend', callback);
+    },
+
+    // 移除非好友关系错误监听
+    offNotFriend: (callback) => {
+        websocketManager.off('not_friend', callback);
+    },
+
+
 
     // 监听认证成功
     onAuthSuccess: (callback) => {

@@ -1,9 +1,9 @@
+// ChatList.jsx
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { messageApi } from '../../api/message';
-import { friendApi } from '../../api/friend';
-import { groupApi } from '../../api/group';
 import { useWebSocket } from '../../components/WebSocket/WebSocketProvider';
+import { useChat } from '../../context/chatContext';
 import { getCurrentUser } from '../../api/user';
 import './Chat.css';
 
@@ -21,61 +21,20 @@ const ChatList = () => {
 
     const currentUser = getCurrentUser();
     const { unreadCount, connectionStatus, reconnect } = useWebSocket();
+    const { cacheConversation, cacheUser, getCachedConversation } = useChat();
 
-    // 获取会话列表
-    const fetchConversations = useCallback(async (pageNum = 1, isRefresh = false) => {
-        try {
-            if (isRefresh) {
-                setRefreshing(true);
-            } else {
-                setLoading(true);
-            }
-
-            setError(null);
-
-            const response = await messageApi.listConversations({
-                page: pageNum,
-                page_size: 20
-            });
-
-            if (response && response.conversations) {
-                const formattedConversations = response.conversations.map(conv => ({
-                    ...conv,
-                    // 确保所有ID都是字符串
-                    id: String(conv.id),
-                    target_id: String(conv.target_id),
-                    group_id: conv.group_id ? String(conv.group_id) : '',
-                    member_count: Number(conv.member_count || 0),
-                    unread_count: Number(conv.unread_count || 0)
-                }));
-
-                if (pageNum === 1) {
-                    setConversations(formattedConversations);
-                } else {
-                    setConversations(prev => [...prev, ...formattedConversations]);
-                }
-
-                setHasMore(response.page_stats?.has_next || false);
-                setPage(pageNum);
-
-                // 重新计算过滤后的列表
-                filterConversations(formattedConversations, activeTab, searchQuery, pageNum === 1);
-            } else {
-                setConversations([]);
-                setFilteredConversations([]);
-            }
-        } catch (error) {
-            console.error('获取会话列表失败:', error);
-            setError('获取会话列表失败，请检查网络连接');
-
-            if (error.response?.status === 401) {
-                setError('请先登录');
-            }
-        } finally {
-            setLoading(false);
-            setRefreshing(false);
-        }
-    }, [activeTab, searchQuery]);
+    // 防抖函数
+    const debounce = (func, wait) => {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    };
 
     // 过滤和搜索会话
     const filterConversations = useCallback((convs, tab, query, replace = false) => {
@@ -116,11 +75,113 @@ const ChatList = () => {
         }
     }, []);
 
-    // 搜索会话
-    const handleSearch = useCallback((query) => {
-        setSearchQuery(query);
-        filterConversations(conversations, activeTab, query, true);
-    }, [conversations, activeTab, filterConversations]);
+    // 获取会话列表
+    const fetchConversations = useCallback(async (pageNum = 1, isRefresh = false) => {
+        try {
+            if (isRefresh) {
+                setRefreshing(true);
+            } else {
+                setLoading(true);
+            }
+
+            setError(null);
+
+            const response = await messageApi.listConversations({
+                page: pageNum,
+                page_size: 20
+            });
+
+            if (response && response.conversations) {
+                // 处理会话信息
+                const formattedConversations = response.conversations.map(conv => {
+                    let conversationName = conv.name;
+                    let targetInfo = {};
+
+                    if (conv.type === 0) { // 单聊
+                        const otherMemberId = conv.member_ids?.find(
+                            memberId => String(memberId) !== String(currentUser.id)
+                        );
+
+                        if (otherMemberId) {
+                            targetInfo = {
+                                id: String(otherMemberId),
+                                type: 'user'
+                            };
+
+                            if (!conversationName) {
+                                conversationName = `用户${otherMemberId}`;
+                            }
+                        }
+                    } else { // 群聊
+                        const groupId = conv.group_id || conv.target_id;
+                        targetInfo = {
+                            id: String(groupId),
+                            type: 'group'
+                        };
+
+                        if (!conversationName) {
+                            conversationName = `群聊${groupId}`;
+                        }
+                    }
+
+                    const formattedConv = {
+                        ...conv,
+                        id: String(conv.id),
+                        target_id: String(conv.target_id),
+                        group_id: conv.group_id ? String(conv.group_id) : '',
+                        member_count: Number(conv.member_count || 0),
+                        unread_count: Number(conv.unread_count || 0),
+                        member_ids: conv.member_ids?.map(id => String(id)) || [],
+                        name: conversationName,
+                        targetInfo
+                    };
+
+                    // 缓存会话
+                    cacheConversation(formattedConv);
+
+                    return formattedConv;
+                });
+
+                if (pageNum === 1) {
+                    setConversations(formattedConversations);
+                } else {
+                    setConversations(prev => {
+                        // 避免重复
+                        const existingIds = new Set(prev.map(c => String(c.id)));
+                        const newConvs = formattedConversations.filter(
+                            c => !existingIds.has(String(c.id))
+                        );
+                        return [...prev, ...newConvs];
+                    });
+                }
+
+                setHasMore(response.page_stats?.has_next || false);
+                setPage(pageNum);
+                filterConversations(formattedConversations, activeTab, searchQuery, pageNum === 1);
+            } else {
+                setConversations([]);
+                setFilteredConversations([]);
+            }
+        } catch (error) {
+            console.error('获取会话列表失败:', error);
+            setError('获取会话列表失败，请检查网络连接');
+            if (error.response?.status === 401) {
+                setError('请先登录');
+            }
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
+    }, [activeTab, searchQuery, currentUser.id, filterConversations, cacheConversation]);
+
+    // 防抖搜索
+    const debouncedSearch = useCallback(
+        debounce((query) => {
+            setSearchQuery(query);
+            filterConversations(conversations, activeTab, query, true);
+        }, 300),
+        [conversations, activeTab, filterConversations]
+    );
 
     // 过滤会话类型
     const filterByType = useCallback((type) => {
@@ -149,60 +210,99 @@ const ChatList = () => {
         }
     };
 
-    // 创建新会话
+    // 创建新会话 - 优化版本
     const handleCreateConversation = async (type = 'single') => {
-        if (type === 'single') {
-            const friendId = prompt('请输入好友ID：');
-            if (friendId && friendId.trim()) {
-                try {
-                    const response = await messageApi.createConversation(
-                        friendId.trim(),
-                        0,
-                        '你好，我们开始聊天吧！'
-                    );
+        const promptText = type === 'single' ? '请输入好友ID：' : '请输入群组ID：';
+        const targetId = prompt(promptText);
 
-                    if (response && response.conversation_id) {
-                        // 刷新会话列表
-                        fetchConversations(1, true);
-                        // 跳转到聊天
-                        navigate(`/chat/single/${friendId}`, {
-                            state: {
-                                conversationId: response.conversation_id,
-                                targetId: friendId
-                            }
-                        });
-                    }
-                } catch (error) {
-                    console.error('创建会话失败:', error);
-                    alert('创建会话失败，请检查好友关系或网络连接');
-                }
-            }
-        } else if (type === 'group') {
-            const groupId = prompt('请输入群组ID：');
-            if (groupId && groupId.trim()) {
-                try {
-                    const response = await messageApi.createConversation(
-                        groupId.trim(),
-                        1,
-                        '大家好！'
-                    );
+        if (!targetId?.trim()) return;
 
-                    if (response && response.conversation_id) {
-                        fetchConversations(1, true);
-                        navigate(`/chat/group/${groupId}`, {
-                            state: {
-                                conversationId: response.conversation_id,
-                                targetId: groupId
-                            }
-                        });
+        try {
+            const response = await messageApi.createConversation(
+                targetId.trim(),
+                type === 'single' ? 0 : 1,
+                type === 'single' ? '你好，我们开始聊天吧！' : '大家好！'
+            );
+
+            if (response && response.conversation_id) {
+                // 立即获取会话详情并缓存
+                try {
+                    const convDetail = await messageApi.getConversationDetail(response.conversation_id);
+                    if (convDetail?.conversation) {
+                        cacheConversation(convDetail.conversation);
                     }
-                } catch (error) {
-                    console.error('创建会话失败:', error);
-                    alert('创建会话失败，请检查是否已加入该群');
+                } catch (e) {
+                    console.warn('获取会话详情失败，但创建成功:', e);
                 }
+
+                // 刷新会话列表
+                fetchConversations(1, true);
+
+                // 跳转到聊天
+                navigate(`/chat/${type}/${targetId}`, {
+                    state: {
+                        conversationId: response.conversation_id,
+                        conversation: {
+                            id: response.conversation_id,
+                            type: type === 'single' ? 0 : 1,
+                            target_id: targetId
+                        }
+                    },
+                    replace: true
+                });
             }
+        } catch (error) {
+            console.error('创建会话失败:', error);
+            const errorMsg = type === 'single'
+                ? '创建会话失败，请检查好友关系或网络连接'
+                : '创建会话失败，请检查是否已加入该群';
+            alert(errorMsg);
         }
     };
+
+    // 点击会话跳转
+    const handleConversationClick = useCallback((conversation) => {
+        if (conversation.type === 0) { // 单聊
+            const otherMemberId = conversation.member_ids?.find(
+                memberId => String(memberId) !== String(currentUser.id)
+            );
+
+            if (otherMemberId) {
+                // 检查是否有缓存
+                const cachedConv = getCachedConversation(conversation.id);
+                const conversationData = cachedConv || conversation;
+
+                navigate(`/chat/single/${otherMemberId}`, {
+                    state: {
+                        conversationId: conversation.id,
+                        conversation: conversationData
+                    },
+                    replace: true
+                });
+            } else {
+                console.error('无法找到对方用户ID');
+                alert('无法开始聊天：未找到对方用户');
+            }
+        } else { // 群聊
+            const groupId = conversation.group_id || conversation.target_id;
+            if (groupId) {
+                // 检查是否有缓存
+                const cachedConv = getCachedConversation(conversation.id);
+                const conversationData = cachedConv || conversation;
+
+                navigate(`/chat/group/${groupId}`, {
+                    state: {
+                        conversationId: conversation.id,
+                        conversation: conversationData
+                    },
+                    replace: true
+                });
+            } else {
+                console.error('无法找到群组ID');
+                alert('无法开始聊天：未找到群组');
+            }
+        }
+    }, [navigate, currentUser, getCachedConversation]);
 
     // 清空聊天记录
     const handleClearMessages = async (conversationId, e) => {
@@ -329,14 +429,23 @@ const ChatList = () => {
 
     // 加载更多
     const handleLoadMore = () => {
-        if (hasMore && !loading) {
+        if (hasMore && !loading && !refreshing) {
             fetchConversations(page + 1);
         }
     };
 
     // 刷新列表
     const handleRefresh = () => {
-        fetchConversations(1, true);
+        if (!refreshing) {
+            fetchConversations(1, true);
+        }
+    };
+
+    // 监听搜索输入
+    const handleSearchChange = (e) => {
+        const query = e.target.value;
+        setSearchQuery(query);
+        debouncedSearch(query);
     };
 
     // 监听WebSocket连接状态
@@ -352,22 +461,13 @@ const ChatList = () => {
 
         // 设置自动刷新间隔
         const intervalId = setInterval(() => {
-            if (connectionStatus === 'connected') {
+            if (connectionStatus === 'connected' && !loading && !refreshing) {
                 fetchConversations(1, true);
             }
         }, 30000);
 
         return () => clearInterval(intervalId);
     }, [fetchConversations, connectionStatus]);
-
-    // 监听搜索词变化
-    useEffect(() => {
-        const timeoutId = setTimeout(() => {
-            filterConversations(conversations, activeTab, searchQuery, true);
-        }, 300);
-
-        return () => clearTimeout(timeoutId);
-    }, [searchQuery, conversations, activeTab, filterConversations]);
 
     // 计算总未读消息数
     const totalUnreadCount = useMemo(() => {
@@ -421,6 +521,7 @@ const ChatList = () => {
                         className="new-chat-btn"
                         onClick={() => handleCreateConversation('single')}
                         title="新建单聊"
+                        disabled={refreshing}
                     >
                         💬
                     </button>
@@ -428,6 +529,7 @@ const ChatList = () => {
                         className="new-group-btn"
                         onClick={() => handleCreateConversation('group')}
                         title="新建群聊"
+                        disabled={refreshing}
                     >
                         👥
                     </button>
@@ -447,7 +549,7 @@ const ChatList = () => {
                     type="text"
                     placeholder="搜索会话..."
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onChange={handleSearchChange}
                     className="chat-search-input"
                 />
             </div>
@@ -516,22 +618,7 @@ const ChatList = () => {
                             <div
                                 key={conversation.id}
                                 className={`chat-list-item ${conversation.unread_count > 0 ? 'unread' : ''}`}
-                                onClick={() => {
-                                    const state = {
-                                        conversationId: conversation.id,
-                                        conversationName: conversation.name
-                                    };
-
-                                    if (conversation.type === 0) {
-                                        navigate(`/chat/single/${conversation.target_id}`, {
-                                            state: state
-                                        });
-                                    } else {
-                                        navigate(`/chat/group/${conversation.target_id}`, {
-                                            state: state
-                                        });
-                                    }
-                                }}
+                                onClick={() => handleConversationClick(conversation)}
                             >
                                 <div className="chat-item-avatar">
                                     <img
@@ -622,7 +709,7 @@ const ChatList = () => {
                                 <button
                                     className="load-more-btn"
                                     onClick={handleLoadMore}
-                                    disabled={loading}
+                                    disabled={loading || refreshing}
                                 >
                                     {loading ? '加载中...' : '加载更多'}
                                 </button>

@@ -65,7 +65,33 @@ const VideoDetail = () => {
             console.log('视频详情响应:', response);
 
             if (response && response.video) {
-                const formattedVideo = formatVideoData(response.video);
+                const videoData = response.video;
+                const formattedVideo = {
+                    id: videoData.id,
+                    title: videoData.title,
+                    description: videoData.description || '',
+                    author: videoData.author?.name || '用户',
+                    authorId: videoData.author?.id,
+                    avatar: videoData.author?.avatar || DEFAULT_AVATAR,
+                    views: videoData.viewCount || Math.floor(Math.random() * 10000) + 1000,
+                    likes: videoData.favoriteCount || 0,
+                    dislikes: 0, // 后端没有返回，默认为0
+                    comments: videoData.commentCount || 0,
+                    shares: 0,
+                    videoUrl: videoData.play_url,
+                    thumbnail: videoData.cover_url,
+                    uploadTime: '刚刚',
+                    tags: [],
+                    isFavorite: videoData.isFavorite || false,
+                    isDisliked: false,
+                    isFollowing: videoData.author?.isFollowing || false,
+                    isCollected: videoData.isCollected || false,
+                    collectedCount: videoData.collectedCount || 0,
+                    // 直接保留原始字段
+                    play_url: videoData.play_url,
+                    cover_url: videoData.cover_url
+                };
+
                 console.log('格式化后的视频数据:', formattedVideo);
                 setVideo(formattedVideo);
 
@@ -353,19 +379,19 @@ const VideoDetail = () => {
             <div className="video-detail-content">
                 <div className="video-player-section">
                     <div className="video-player">
-                        {video.play_url ? (
+                        {video.play_url || video.videoUrl ? (
                             <video
                                 controls
                                 className="video-player-element"
-                                poster={video.thumbnail}
-                                src={video.play_url}
+                                poster={video.thumbnail || video.cover_url}
+                                src={video.play_url || video.videoUrl}
                             >
                                 您的浏览器不支持视频播放
                             </video>
                         ) : (
                             <div className="video-placeholder">
                                 <img
-                                    src={video.thumbnail || 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4'}
+                                    src={video.thumbnail || video.cover_url || 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4'}
                                     alt={video.title}
                                 />
                                 <div className="play-button">▶</div>

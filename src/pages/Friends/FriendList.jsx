@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { friendApi } from '../../api/friend';
-import { webSocketAPI } from '../../api/websocket';
 import SearchUsers from '../../components/User/SearchUsers';
+import { getCurrentUser } from '../../api/user';
 import './Friends.css';
 
 const FriendList = () => {
@@ -13,6 +13,11 @@ const FriendList = () => {
     const [friendGroups, setFriendGroups] = useState([]);
     const [onlineStatus, setOnlineStatus] = useState({});
     const [showSearch, setShowSearch] = useState(false);
+    const [stats, setStats] = useState({
+        total: 0,
+        online: 0,
+        groups: 0
+    });
     const navigate = useNavigate();
 
     // 获取好友列表
@@ -20,28 +25,51 @@ const FriendList = () => {
         try {
             setLoading(true);
             const response = await friendApi.listFriends({
-                page: 1,
-                page_size: 100
+                page_stats: {
+                    page: 1,
+                    size: 100
+                }
             });
 
+            console.log('好友列表响应:', response);
+
             if (response && response.friends) {
-                setFriends(response.friends);
+                const friendsList = response.friends;
+                setFriends(friendsList);
+                setStats(prev => ({
+                    ...prev,
+                    total: friendsList.length
+                }));
 
                 // 提取分组
-                const groups = ['全部'];
-                response.friends.forEach(friend => {
-                    if (friend.group_name && !groups.includes(friend.group_name)) {
-                        groups.push(friend.group_name);
+                const groups = new Set(['全部']);
+                friendsList.forEach(friend => {
+                    if (friend.group_name) {
+                        groups.add(friend.group_name);
                     }
                 });
-                setFriendGroups(groups);
+                setFriendGroups(Array.from(groups));
+                setStats(prev => ({
+                    ...prev,
+                    groups: groups.size - 1 // 减去"全部"
+                }));
 
                 // 批量获取在线状态
-                const userIds = response.friends.map(f => f.friend.id);
+                const userIds = friendsList.map(f => f.friend?.id || f.id).filter(id => id);
                 if (userIds.length > 0) {
-                    const onlineResponse = await friendApi.batchGetUserOnlineStatus(userIds);
+                    const onlineResponse = await friendApi.batchGetUserOnlineStatus({
+                        user_ids: userIds
+                    });
                     if (onlineResponse && onlineResponse.online_status) {
                         setOnlineStatus(onlineResponse.online_status);
+
+                        // 计算在线好友数
+                        const onlineCount = Object.values(onlineResponse.online_status)
+                            .filter(status => status === 1).length;
+                        setStats(prev => ({
+                            ...prev,
+                            online: onlineCount
+                        }));
                     }
                 }
             }
@@ -52,7 +80,7 @@ const FriendList = () => {
         }
     }, []);
 
-    // 搜索好友 - 现在使用POST请求
+    // 搜索好友
     const handleSearch = async (query) => {
         setSearchQuery(query);
 
@@ -64,19 +92,35 @@ const FriendList = () => {
 
         try {
             const searchResponse = await friendApi.searchUsers(query, {
-                page: 1,
-                page_size: 20
+                page_stats: {
+                    page: 1,
+                    size: 20
+                }
             });
 
             if (searchResponse && searchResponse.users) {
-                // 将搜索结果格式化为好友列表格式
-                const searchResults = searchResponse.users.map(user => ({
-                    id: user.id,
-                    friend: user,
-                    remark: '',
-                    group_name: '',
-                    status: 1
-                }));
+                // 检查这些用户是否是好友
+                const currentFriends = friends.reduce((map, friend) => {
+                    const friendId = friend.friend?.id || friend.id;
+                    if (friendId) {
+                        map[friendId] = friend;
+                    }
+                    return map;
+                }, {});
+
+                const searchResults = searchResponse.users.map(user => {
+                    const existingFriend = currentFriends[user.id];
+                    if (existingFriend) {
+                        return existingFriend;
+                    }
+                    return {
+                        id: user.id,
+                        friend: user,
+                        remark: '',
+                        group_name: '',
+                        status: 0 // 不是好友
+                    };
+                });
                 setFriends(searchResults);
             }
         } catch (error) {
@@ -86,13 +130,20 @@ const FriendList = () => {
 
     // 删除好友
     const handleDeleteFriend = async (friendId) => {
-        if (!window.confirm('确定要删除这个好友吗？')) {
+        if (!window.confirm('确定要删除这个好友吗？删除后将不能查看对方动态。')) {
             return;
         }
 
         try {
             await friendApi.deleteFriend(friendId);
-            setFriends(prev => prev.filter(f => f.friend.id !== friendId));
+            setFriends(prev => prev.filter(f =>
+                (f.friend?.id || f.id) !== friendId
+            ));
+            setStats(prev => ({
+                ...prev,
+                total: prev.total - 1,
+                online: prev.online - (onlineStatus[friendId] === 1 ? 1 : 0)
+            }));
         } catch (error) {
             console.error('删除好友失败:', error);
             alert('删除失败，请重试');
@@ -107,11 +158,12 @@ const FriendList = () => {
         try {
             await friendApi.updateFriendRemark(friendId, newRemark);
             setFriends(prev =>
-                prev.map(friend =>
-                    friend.friend.id === friendId
+                prev.map(friend => {
+                    const friendIdToCompare = friend.friend?.id || friend.id;
+                    return friendIdToCompare === friendId
                         ? { ...friend, remark: newRemark }
                         : friend
-                )
+                })
             );
         } catch (error) {
             console.error('更新备注失败:', error);
@@ -127,16 +179,21 @@ const FriendList = () => {
         try {
             await friendApi.setFriendGroup(friendId, newGroup);
             setFriends(prev =>
-                prev.map(friend =>
-                    friend.friend.id === friendId
+                prev.map(friend => {
+                    const friendIdToCompare = friend.friend?.id || friend.id;
+                    return friendIdToCompare === friendId
                         ? { ...friend, group_name: newGroup }
                         : friend
-                )
+                })
             );
 
             // 更新分组列表
             if (newGroup && !friendGroups.includes(newGroup)) {
                 setFriendGroups(prev => [...prev, newGroup]);
+                setStats(prev => ({
+                    ...prev,
+                    groups: prev.groups + 1
+                }));
             }
         } catch (error) {
             console.error('设置分组失败:', error);
@@ -171,6 +228,10 @@ const FriendList = () => {
 
     // 过滤好友
     const filteredFriends = friends.filter(friend => {
+        const friendId = friend.friend?.id || friend.id;
+        const friendName = friend.remark || friend.friend?.name || friend.name || '';
+        const friendUsername = friend.friend?.username || '';
+
         // 分组过滤
         if (activeGroup !== 'all' && friend.group_name !== activeGroup) {
             return false;
@@ -179,8 +240,8 @@ const FriendList = () => {
         // 搜索过滤
         if (searchQuery) {
             const query = searchQuery.toLowerCase();
-            const name = (friend.remark || friend.friend.name || '').toLowerCase();
-            const username = (friend.friend.username || '').toLowerCase();
+            const name = friendName.toLowerCase();
+            const username = friendUsername.toLowerCase();
             return name.includes(query) || username.includes(query);
         }
 
@@ -189,8 +250,10 @@ const FriendList = () => {
 
     // 按在线状态排序
     const sortedFriends = [...filteredFriends].sort((a, b) => {
-        const statusA = onlineStatus[a.friend.id] || 0;
-        const statusB = onlineStatus[b.friend.id] || 0;
+        const friendIdA = a.friend?.id || a.id;
+        const friendIdB = b.friend?.id || b.id;
+        const statusA = onlineStatus[friendIdA] || 0;
+        const statusB = onlineStatus[friendIdB] || 0;
 
         // 在线状态降序排列（在线 > 离线）
         if (statusA !== statusB) {
@@ -198,8 +261,8 @@ const FriendList = () => {
         }
 
         // 字母顺序
-        const nameA = (a.remark || a.friend.name || '').toLowerCase();
-        const nameB = (b.remark || b.friend.name || '').toLowerCase();
+        const nameA = (a.remark || a.friend?.name || a.name || '').toLowerCase();
+        const nameB = (b.remark || b.friend?.name || b.name || '').toLowerCase();
         return nameA.localeCompare(nameB);
     });
 
@@ -213,7 +276,7 @@ const FriendList = () => {
         fetchFriends();
     }, [fetchFriends]);
 
-    if (loading) {
+    if (loading && friends.length === 0) {
         return (
             <div className="friend-list-loading">
                 <div className="loading-spinner"></div>
@@ -235,6 +298,7 @@ const FriendList = () => {
                     </button>
                     <Link to="/friend-requests" className="friend-requests-link">
                         好友申请
+                        <span className="request-count">{/* 这里可以显示未处理的申请数 */}</span>
                     </Link>
                 </div>
             </div>
@@ -270,6 +334,21 @@ const FriendList = () => {
                 />
             </div>
 
+            <div className="friend-stats">
+                <div className="stat-item">
+                    <strong>{stats.total}</strong>
+                    <span>全部好友</span>
+                </div>
+                <div className="stat-item">
+                    <strong>{stats.online}</strong>
+                    <span>在线好友</span>
+                </div>
+                <div className="stat-item">
+                    <strong>{stats.groups}</strong>
+                    <span>分组数量</span>
+                </div>
+            </div>
+
             <div className="friend-list-tabs">
                 <div className="friend-groups">
                     {friendGroups.map(group => (
@@ -279,21 +358,13 @@ const FriendList = () => {
                             onClick={() => setActiveGroup(group)}
                         >
                             {group}
+                            {group !== '全部' && (
+                                <span className="group-count">
+                  ({friends.filter(f => f.group_name === group).length})
+                </span>
+                            )}
                         </button>
                     ))}
-                </div>
-            </div>
-
-            <div className="friend-stats">
-                <div className="stat-item">
-                    <strong>{friends.length}</strong>
-                    <span>全部好友</span>
-                </div>
-                <div className="stat-item">
-                    <strong>
-                        {Object.values(onlineStatus).filter(status => status === 1).length}
-                    </strong>
-                    <span>在线好友</span>
                 </div>
             </div>
 
@@ -313,30 +384,34 @@ const FriendList = () => {
                 ) : (
                     <div className="friends-grid">
                         {sortedFriends.map(friend => {
-                            const isOnline = onlineStatus[friend.friend.id] === 1;
-                            const statusColor = getOnlineStatusColor(onlineStatus[friend.friend.id]);
+                            const friendId = friend.friend?.id || friend.id;
+                            const friendName = friend.remark || friend.friend?.name || friend.name || '未知用户';
+                            const friendAvatar = friend.friend?.avatar || friend.avatar || '/default-avatar.png';
+                            const originalName = friend.friend?.name || friend.name;
+                            const isOnline = onlineStatus[friendId] === 1;
+                            const statusColor = getOnlineStatusColor(onlineStatus[friendId]);
 
                             return (
-                                <div key={friend.friend.id} className="friend-card">
+                                <div key={friendId} className="friend-card">
                                     <div className="friend-avatar">
                                         <img
-                                            src={friend.friend.avatar || '/default-avatar.png'}
-                                            alt={friend.remark || friend.friend.name}
+                                            src={friendAvatar}
+                                            alt={friendName}
                                             className="avatar-img"
                                         />
                                         <div
                                             className="online-indicator"
                                             style={{ backgroundColor: statusColor }}
-                                            title={getOnlineStatusText(onlineStatus[friend.friend.id])}
+                                            title={getOnlineStatusText(onlineStatus[friendId])}
                                         />
                                     </div>
 
                                     <div className="friend-info">
                                         <div className="friend-name">
-                                            <h4>{friend.remark || friend.friend.name || '未知用户'}</h4>
-                                            {friend.remark && (
+                                            <h4>{friendName}</h4>
+                                            {friend.remark && originalName && friend.remark !== originalName && (
                                                 <span className="original-name">
-                          ({friend.friend.name})
+                          ({originalName})
                         </span>
                                             )}
                                         </div>
@@ -350,28 +425,28 @@ const FriendList = () => {
                                         <div className="friend-actions">
                                             <button
                                                 className="action-btn chat-btn"
-                                                onClick={() => handleStartChat(friend.friend.id)}
+                                                onClick={() => handleStartChat(friendId)}
                                                 title="发起聊天"
                                             >
                                                 💬
                                             </button>
                                             <button
                                                 className="action-btn remark-btn"
-                                                onClick={() => handleUpdateRemark(friend.friend.id, friend.remark)}
+                                                onClick={() => handleUpdateRemark(friendId, friend.remark)}
                                                 title="修改备注"
                                             >
                                                 ✏️
                                             </button>
                                             <button
                                                 className="action-btn group-btn"
-                                                onClick={() => handleSetGroup(friend.friend.id, friend.group_name)}
+                                                onClick={() => handleSetGroup(friendId, friend.group_name)}
                                                 title="设置分组"
                                             >
                                                 📁
                                             </button>
                                             <button
                                                 className="action-btn delete-btn"
-                                                onClick={() => handleDeleteFriend(friend.friend.id)}
+                                                onClick={() => handleDeleteFriend(friendId)}
                                                 title="删除好友"
                                             >
                                                 🗑️
