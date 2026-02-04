@@ -1,5 +1,5 @@
 // ChatList.jsx
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { messageApi } from '../../api/message';
 import { useWebSocket } from '../../components/WebSocket/WebSocketProvider';
@@ -23,6 +23,11 @@ const ChatList = () => {
     const { unreadCount, connectionStatus, reconnect } = useWebSocket();
     const { cacheConversation, cacheUser, getCachedConversation } = useChat();
 
+    // 使用 ref 来存储请求状态和定时器
+    const fetchTimeoutRef = useRef(null);
+    const isFetchingRef = useRef(false);
+    const lastFetchTimeRef = useRef(0);
+
     // 防抖函数
     const debounce = (func, wait) => {
         let timeout;
@@ -40,14 +45,12 @@ const ChatList = () => {
     const filterConversations = useCallback((convs, tab, query, replace = false) => {
         let filtered = [...convs];
 
-        // 按类型过滤
         if (tab === 'single') {
             filtered = filtered.filter(conv => conv.type === 0);
         } else if (tab === 'group') {
             filtered = filtered.filter(conv => conv.type === 1);
         }
 
-        // 按搜索词过滤
         if (query.trim()) {
             const searchStr = query.toLowerCase();
             filtered = filtered.filter(conv => {
@@ -61,7 +64,6 @@ const ChatList = () => {
             });
         }
 
-        // 按最后消息时间排序（最新的在前面）
         filtered.sort((a, b) => {
             const timeA = a.last_msg_time || 0;
             const timeB = b.last_msg_time || 0;
@@ -75,12 +77,34 @@ const ChatList = () => {
         }
     }, []);
 
-    // 获取会话列表
+    // 获取会话列表 - 防抖版本
     const fetchConversations = useCallback(async (pageNum = 1, isRefresh = false) => {
+        // 防抖处理：取消之前的请求
+        if (fetchTimeoutRef.current) {
+            clearTimeout(fetchTimeoutRef.current);
+        }
+
+        // 防重处理：如果正在请求，则跳过
+        if (isFetchingRef.current && !isRefresh) {
+            console.log('正在请求中，跳过此次请求');
+            return;
+        }
+
+        const now = Date.now();
+        // 防刷处理：1秒内不重复请求（除非是手动刷新）
+        if (!isRefresh && now - lastFetchTimeRef.current < 1000) {
+            console.log('请求过于频繁，跳过');
+            return;
+        }
+
+        // 设置请求状态
+        isFetchingRef.current = true;
+        lastFetchTimeRef.current = now;
+
         try {
             if (isRefresh) {
                 setRefreshing(true);
-            } else {
+            } else if (pageNum === 1) {
                 setLoading(true);
             }
 
@@ -92,12 +116,11 @@ const ChatList = () => {
             });
 
             if (response && response.conversations) {
-                // 处理会话信息
                 const formattedConversations = response.conversations.map(conv => {
                     let conversationName = conv.name;
                     let targetInfo = {};
 
-                    if (conv.type === 0) { // 单聊
+                    if (conv.type === 0) {
                         const otherMemberId = conv.member_ids?.find(
                             memberId => String(memberId) !== String(currentUser.id)
                         );
@@ -112,7 +135,7 @@ const ChatList = () => {
                                 conversationName = `用户${otherMemberId}`;
                             }
                         }
-                    } else { // 群聊
+                    } else {
                         const groupId = conv.group_id || conv.target_id;
                         targetInfo = {
                             id: String(groupId),
@@ -136,7 +159,6 @@ const ChatList = () => {
                         targetInfo
                     };
 
-                    // 缓存会话
                     cacheConversation(formattedConv);
 
                     return formattedConv;
@@ -146,7 +168,6 @@ const ChatList = () => {
                     setConversations(formattedConversations);
                 } else {
                     setConversations(prev => {
-                        // 避免重复
                         const existingIds = new Set(prev.map(c => String(c.id)));
                         const newConvs = formattedConversations.filter(
                             c => !existingIds.has(String(c.id))
@@ -164,13 +185,17 @@ const ChatList = () => {
             }
         } catch (error) {
             console.error('获取会话列表失败:', error);
-            setError('获取会话列表失败，请检查网络连接');
+            // 如果不是取消请求的错误，才显示错误信息
+            if (error.message !== '重复请求已取消') {
+                setError('获取会话列表失败，请检查网络连接');
+            }
             if (error.response?.status === 401) {
                 setError('请先登录');
             }
         } finally {
             setLoading(false);
             setRefreshing(false);
+            isFetchingRef.current = false;
         }
     }, [activeTab, searchQuery, currentUser.id, filterConversations, cacheConversation]);
 
@@ -200,7 +225,6 @@ const ChatList = () => {
         try {
             await messageApi.deleteConversation(conversationId);
 
-            // 更新状态
             setConversations(prev => prev.filter(conv => conv.id !== conversationId));
             setFilteredConversations(prev => prev.filter(conv => conv.id !== conversationId));
 
@@ -210,7 +234,7 @@ const ChatList = () => {
         }
     };
 
-    // 创建新会话 - 优化版本
+    // 创建新会话
     const handleCreateConversation = async (type = 'single') => {
         const promptText = type === 'single' ? '请输入好友ID：' : '请输入群组ID：';
         const targetId = prompt(promptText);
@@ -225,7 +249,6 @@ const ChatList = () => {
             );
 
             if (response && response.conversation_id) {
-                // 立即获取会话详情并缓存
                 try {
                     const convDetail = await messageApi.getConversationDetail(response.conversation_id);
                     if (convDetail?.conversation) {
@@ -235,10 +258,8 @@ const ChatList = () => {
                     console.warn('获取会话详情失败，但创建成功:', e);
                 }
 
-                // 刷新会话列表
                 fetchConversations(1, true);
 
-                // 跳转到聊天
                 navigate(`/chat/${type}/${targetId}`, {
                     state: {
                         conversationId: response.conversation_id,
@@ -262,13 +283,12 @@ const ChatList = () => {
 
     // 点击会话跳转
     const handleConversationClick = useCallback((conversation) => {
-        if (conversation.type === 0) { // 单聊
+        if (conversation.type === 0) {
             const otherMemberId = conversation.member_ids?.find(
                 memberId => String(memberId) !== String(currentUser.id)
             );
 
             if (otherMemberId) {
-                // 检查是否有缓存
                 const cachedConv = getCachedConversation(conversation.id);
                 const conversationData = cachedConv || conversation;
 
@@ -283,10 +303,9 @@ const ChatList = () => {
                 console.error('无法找到对方用户ID');
                 alert('无法开始聊天：未找到对方用户');
             }
-        } else { // 群聊
+        } else {
             const groupId = conversation.group_id || conversation.target_id;
             if (groupId) {
-                // 检查是否有缓存
                 const cachedConv = getCachedConversation(conversation.id);
                 const conversationData = cachedConv || conversation;
 
@@ -316,7 +335,6 @@ const ChatList = () => {
             await messageApi.clearMessages(conversationId);
             alert('聊天记录已清空');
 
-            // 更新会话的最后消息
             setConversations(prev => prev.map(conv => {
                 if (conv.id === conversationId) {
                     return {
@@ -351,7 +369,6 @@ const ChatList = () => {
         if (!timestamp || timestamp === 0) return '';
 
         try {
-            // 如果时间戳是秒，转换为毫秒
             const msTimestamp = timestamp < 1000000000000 ? timestamp * 1000 : timestamp;
             const date = new Date(msTimestamp);
             const now = new Date();
@@ -451,26 +468,36 @@ const ChatList = () => {
     // 监听WebSocket连接状态
     useEffect(() => {
         if (connectionStatus === 'connected') {
-            fetchConversations(1, true);
+            // 使用防抖延迟获取，避免频繁请求
+            if (fetchTimeoutRef.current) {
+                clearTimeout(fetchTimeoutRef.current);
+            }
+            fetchTimeoutRef.current = setTimeout(() => {
+                fetchConversations(1, true);
+            }, 500);
         }
     }, [connectionStatus, fetchConversations]);
 
     // 初始化获取会话列表
     useEffect(() => {
-        fetchConversations(1);
+        // 使用防抖延迟初始化
+        if (fetchTimeoutRef.current) {
+            clearTimeout(fetchTimeoutRef.current);
+        }
+        fetchTimeoutRef.current = setTimeout(() => {
+            fetchConversations(1);
+        }, 300);
 
-        // 设置自动刷新间隔
-        const intervalId = setInterval(() => {
-            if (connectionStatus === 'connected' && !loading && !refreshing) {
-                fetchConversations(1, true);
+        // 清理定时器
+        return () => {
+            if (fetchTimeoutRef.current) {
+                clearTimeout(fetchTimeoutRef.current);
             }
-        }, 30000);
-
-        return () => clearInterval(intervalId);
-    }, [fetchConversations, connectionStatus]);
+        };
+    }, [fetchConversations]);
 
     // 计算总未读消息数
-    const totalUnreadCount = useMemo(() => {
+    const totalUnreadCount = React.useMemo(() => {
         return conversations.reduce((total, conv) => total + (Number(conv.unread_count) || 0), 0);
     }, [conversations]);
 

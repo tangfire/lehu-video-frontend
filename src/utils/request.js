@@ -5,7 +5,7 @@ import { clearUserData } from '../api/user';
 // 创建axios实例
 const request = axios.create({
     baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/v1',
-    timeout: 30000, // 增加到30秒
+    timeout: 30000,
     headers: {
         'Content-Type': 'application/json'
     }
@@ -17,7 +17,27 @@ const requestTimers = new Map();
 
 // 生成请求唯一标识
 const generateRequestKey = (config) => {
-    return `${config.method}_${config.url}_${JSON.stringify(config.data)}_${JSON.stringify(config.params)}`;
+    // 对于需要实时更新的请求，不进行防重（聊天相关）
+    const url = config.url || '';
+    const method = config.method || 'get';
+
+    // 检查是否是聊天相关请求
+    const isChatRequest = url.includes('/conversations') ||
+        url.includes('/messages') ||
+        (url.includes('/conversation') && method.toLowerCase() === 'post');
+
+    // 检查是否是视频流请求
+    const isVideoFeed = url.includes('/video/feed');
+
+    // 对于这些实时请求，不进行防重处理
+    if (isChatRequest || isVideoFeed) {
+        return `${method}_${url}_${Date.now()}_${Math.random()}`;
+    }
+
+    // 其他请求使用原有逻辑
+    const dataStr = config.data ? JSON.stringify(config.data) : '';
+    const paramsStr = config.params ? JSON.stringify(config.params) : '';
+    return `${method}_${url}_${dataStr}_${paramsStr}`;
 };
 
 // 请求拦截器
@@ -37,14 +57,22 @@ request.interceptors.request.use(
             config.params = processRequestData(config.params);
         }
 
-        // 检查是否重复请求
+        // 检查是否重复请求（只在非聊天请求时检查）
         const requestKey = generateRequestKey(config);
-        if (pendingRequests.has(requestKey)) {
+        const url = config.url || '';
+
+        // 对于非聊天请求，保持防重逻辑
+        const isChatRequest = url.includes('/conversations') ||
+            url.includes('/messages') ||
+            (url.includes('/conversation') && config.method?.toLowerCase() === 'post');
+        const isVideoFeed = url.includes('/video/feed');
+
+        if (!isChatRequest && !isVideoFeed && pendingRequests.has(requestKey)) {
             console.log('🔄 取消重复请求:', requestKey);
             return Promise.reject(new Error('重复请求已取消'));
         }
 
-        // 添加请求标记
+        // 添加请求标记（对于聊天请求，使用不同的key避免冲突）
         pendingRequests.set(requestKey, true);
 
         // 30秒后自动清理
@@ -54,14 +82,6 @@ request.interceptors.request.use(
         }, 30000);
 
         requestTimers.set(requestKey, timer);
-
-        console.log('🚀 API请求:', {
-            url: config.url,
-            method: config.method,
-            data: config.data,
-            params: config.params,
-            headers: config.headers
-        });
 
         return config;
     },
@@ -85,34 +105,24 @@ request.interceptors.response.use(
             requestTimers.delete(requestKey);
         }
 
-        console.log('✅ API响应:', {
-            url: response.config.url,
-            status: response.status,
-            data: responseData
-        });
-
         // 处理响应数据，确保ID为字符串
         const processedData = processResponseData(responseData);
 
         if (processedData && processedData.code === 0) {
             return processedData.data;
         } else if (processedData && processedData.code !== undefined) {
-            // 业务错误
             const error = {
                 code: processedData.code || -1,
                 message: processedData.message || '请求失败',
                 data: processedData.data,
                 timestamp: processedData.timestamp
             };
-            console.error('❌ 业务错误:', error);
             return Promise.reject(error);
         } else {
-            // 没有code字段，直接返回数据
             return processedData;
         }
     },
     (error) => {
-        // 清理请求标记
         if (error.config) {
             const requestKey = generateRequestKey(error.config);
             pendingRequests.delete(requestKey);
@@ -123,16 +133,7 @@ request.interceptors.response.use(
             }
         }
 
-        console.error('❌ HTTP错误:', {
-            status: error.response?.status,
-            statusText: error.response?.statusText,
-            data: error.response?.data,
-            message: error.message,
-            config: error.config
-        });
-
         if (error.response?.status === 401) {
-            console.log('Token过期，清除用户数据');
             clearUserData();
             setTimeout(() => {
                 window.location.href = '/login';
@@ -163,15 +164,11 @@ function processRequestData(data) {
             const result = { ...obj };
             Object.keys(result).forEach(key => {
                 const value = result[key];
-
-                // 处理ID字段
                 if (key.includes('id') || key.includes('Id') || key.includes('ID')) {
                     if (typeof value === 'number') {
                         result[key] = String(value);
                     }
                 }
-
-                // 递归处理嵌套对象
                 if (value && typeof value === 'object') {
                     result[key] = process(value);
                 }
@@ -198,15 +195,11 @@ function processResponseData(data) {
             const result = { ...obj };
             Object.keys(result).forEach(key => {
                 const value = result[key];
-
-                // 处理ID字段
                 if (key.includes('id') || key.includes('Id') || key.includes('ID')) {
                     if (typeof value === 'number' || (typeof value === 'string' && /^\d+$/.test(value))) {
                         result[key] = String(value);
                     }
                 }
-
-                // 递归处理嵌套对象
                 if (value && typeof value === 'object') {
                     result[key] = process(value);
                 }

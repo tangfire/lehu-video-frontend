@@ -1,3 +1,4 @@
+// WebSocketProvider.jsx
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { webSocketAPI } from '../../api/websocket';
 import { getCurrentUser } from '../../api/user';
@@ -19,26 +20,13 @@ export const WebSocketProvider = ({ children }) => {
     const [typingUsers, setTypingUsers] = useState(new Map());
     const [messageStatusUpdates, setMessageStatusUpdates] = useState(new Map());
 
-    // 防抖函数定义
-    const debounce = (func, wait) => {
-        let timeout;
-        return function executedFunction(...args) {
-            const later = () => {
-                clearTimeout(timeout);
-                func(...args);
-            };
-            clearTimeout(timeout);
-            timeout = setTimeout(later, wait);
-        };
-    };
-
+    // 处理新消息
     const handleNewMessage = useCallback((message) => {
         console.log('收到新消息:', message);
 
         // 触发新消息事件，让ChatRoom组件处理
-        onMessage?.(message);
+        // 注意：这里我们不再直接更新状态，而是通过事件让组件自己处理
 
-        // 如果是对方的消息，显示通知
         const user = getCurrentUser();
         if (user && String(message.sender_id) !== String(user.id)) {
             setUnreadCount(prev => prev + 1);
@@ -47,7 +35,7 @@ export const WebSocketProvider = ({ children }) => {
                 id: Date.now(),
                 type: 'message',
                 title: '新消息',
-                content: `收到新消息`,
+                content: `收到来自用户 ${message.sender_id} 的消息`,
                 timestamp: Date.now(),
                 read: false
             };
@@ -56,9 +44,7 @@ export const WebSocketProvider = ({ children }) => {
         }
     }, []);
 
-
-
-    // 处理消息发送成功 - 修复：正确处理发送成功事件
+    // 处理消息发送成功
     const handleMessageSent = useCallback((data) => {
         console.log('收到发送确认:', data);
 
@@ -80,12 +66,12 @@ export const WebSocketProvider = ({ children }) => {
                 timestamp: Date.now()
             };
 
-            // 🔥 用 client_msg_id 做升级 key（最重要）
+            // 用 client_msg_id 做升级 key
             if (clientId) {
                 newMap.set(String(clientId), updateObj);
             }
 
-            // 🔁 同时也用 serverId，方便后续 delivered/read
+            // 同时也用 serverId，方便后续 delivered/read
             if (serverId) {
                 newMap.set(String(serverId), updateObj);
             }
@@ -95,8 +81,7 @@ export const WebSocketProvider = ({ children }) => {
         });
     }, []);
 
-
-    // 处理消息已送达 - 修复：确保正确更新状态
+    // 处理消息已送达
     const handleMessageDelivered = useCallback((data) => {
         console.log('消息已送达:', data);
 
@@ -153,7 +138,6 @@ export const WebSocketProvider = ({ children }) => {
             return newMap;
         });
     }, []);
-
 
     // 处理消息撤回
     const handleMessageRecalled = useCallback((data) => {
@@ -226,7 +210,19 @@ export const WebSocketProvider = ({ children }) => {
         }
     }, []);
 
-    // 获取消息状态更新 - 强制转 String
+    // 监听连接状态变化并自动重连
+    useEffect(() => {
+        if (connectionStatus === 'disconnected') {
+            const timer = setTimeout(() => {
+                console.log('尝试重新连接WebSocket...');
+                connectWebSocket();
+            }, 3000);
+
+            return () => clearTimeout(timer);
+        }
+    }, [connectionStatus, connectWebSocket]);
+
+    // 获取消息状态更新
     const getMessageStatusUpdate = useCallback((id) => {
         return messageStatusUpdates.get(String(id));
     }, [messageStatusUpdates]);
@@ -303,18 +299,19 @@ export const WebSocketProvider = ({ children }) => {
             webSocketAPI.offMessageRecalled(handleMessageRecalled);
             webSocketAPI.offTyping(handleTyping);
             webSocketAPI.offNotification(handleNotification);
+            webSocketAPI.offNotFriend(handleNotFriend);
 
             window.removeEventListener('storage', handleStorageChange);
         };
     }, [connectWebSocket, handleNewMessage, handleMessageSent, handleMessageDelivered,
         handleMessageRead, handleMessageRecalled, handleTyping, handleNotification,
-        handleConnectionStatus]);
+        handleConnectionStatus, handleNotFriend]);
 
     const sendMessage = useCallback((messageData) => {
         return webSocketAPI.sendMessage(messageData);
     }, []);
 
-    const sendTypingStatus = useCallback((receiverId, convType, isTyping, text) => {
+    const sendTypingStatus = useCallback((receiverId, convType, isTyping, text = '') => {
         return webSocketAPI.sendTypingStatus(receiverId, convType, isTyping, text);
     }, []);
 
@@ -357,7 +354,9 @@ export const WebSocketProvider = ({ children }) => {
             return typingData ? typingData.isTyping : false;
         }, [typingUsers]),
         isConnected: () => webSocketAPI.isConnected(),
-        reconnect: connectWebSocket
+        reconnect: connectWebSocket,
+        onMessage: webSocketAPI.onMessage,
+        offMessage: webSocketAPI.offMessage
     };
 
     return (

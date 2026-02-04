@@ -1,3 +1,4 @@
+// websocket.js
 class WebSocketManager {
     constructor() {
         this.ws = null;
@@ -6,6 +7,8 @@ class WebSocketManager {
         this.maxReconnectAttempts = 5;
         this.reconnectInterval = null;
         this.heartbeatInterval = null;
+        this.lastHeartbeatTime = null;
+        this.connectionCheckInterval = null;
     }
 
     connect(token) {
@@ -28,7 +31,14 @@ class WebSocketManager {
             this.emit('connection_established');
             this.emit('connection_status', 'connected');
 
+            // 发送认证消息
+            this.send({
+                action: 'auth',
+                timestamp: Date.now()
+            });
+
             this.startHeartbeat();
+            this.startConnectionCheck();
         };
 
         this.ws.onmessage = (event) => {
@@ -44,6 +54,7 @@ class WebSocketManager {
         this.ws.onclose = (event) => {
             console.log('WebSocket断开连接:', event.code, event.reason);
             this.stopHeartbeat();
+            this.stopConnectionCheck();
 
             // 触发连接状态更新
             this.emit('connection_status', 'disconnected');
@@ -81,6 +92,7 @@ class WebSocketManager {
                     action: 'ping',
                     timestamp: Date.now()
                 });
+                this.lastHeartbeatTime = Date.now();
             }
         }, 30000);
     }
@@ -89,6 +101,39 @@ class WebSocketManager {
         if (this.heartbeatInterval) {
             clearInterval(this.heartbeatInterval);
             this.heartbeatInterval = null;
+        }
+    }
+
+    // 连接检查
+    startConnectionCheck() {
+        this.stopConnectionCheck();
+
+        this.connectionCheckInterval = setInterval(() => {
+            if (this.isConnected()) {
+                // 如果超过60秒没有收到心跳响应，认为连接断开
+                if (this.lastHeartbeatTime && Date.now() - this.lastHeartbeatTime > 60000) {
+                    console.warn('心跳超时，重新连接...');
+                    this.reconnect();
+                }
+            }
+        }, 10000);
+    }
+
+    stopConnectionCheck() {
+        if (this.connectionCheckInterval) {
+            clearInterval(this.connectionCheckInterval);
+            this.connectionCheckInterval = null;
+        }
+    }
+
+    // 重新连接
+    reconnect() {
+        const token = localStorage.getItem('token');
+        if (token) {
+            this.disconnect();
+            setTimeout(() => {
+                this.connect(token);
+            }, 1000);
         }
     }
 
@@ -129,7 +174,7 @@ class WebSocketManager {
     // 发送已读回执
     sendReadReceipt(conversationId, messageId) {
         const message = {
-            action: 'mark_read',
+            action: 'read_message',
             data: {
                 conversation_id: String(conversationId),
                 message_id: String(messageId)
@@ -173,50 +218,56 @@ class WebSocketManager {
 
         switch (action) {
             case 'new_message':
+            case 'receive_message':
                 this.emit('new_message', {
                     ...rest.data,
+                    action: action,
                     // 确保ID是字符串
-                    id: String(rest.data.id),
-                    sender_id: String(rest.data.sender_id),
-                    receiver_id: String(rest.data.receiver_id),
-                    conversation_id: String(rest.data.conversation_id)
+                    id: String(rest.data?.id || rest.data?.message_id),
+                    sender_id: String(rest.data?.sender_id),
+                    receiver_id: String(rest.data?.receiver_id),
+                    conversation_id: String(rest.data?.conversation_id)
                 });
                 break;
             case 'message_sent':
                 this.emit('message_sent', {
                     ...rest.data,
+                    action: action,
                     // 确保ID是字符串
-                    message_id: String(rest.data.message_id),
-                    client_msg_id: String(rest.data.client_msg_id)
+                    message_id: String(rest.data?.message_id),
+                    client_msg_id: String(rest.data?.client_msg_id)
                 });
                 break;
             case 'message_delivered':
                 this.emit('message_delivered', {
                     ...rest.data,
+                    action: action,
                     // 确保ID是字符串
-                    message_id: String(rest.data.message_id),
-                    receiver_id: String(rest.data.receiver_id)
+                    message_id: String(rest.data?.message_id),
+                    receiver_id: String(rest.data?.receiver_id)
                 });
                 break;
             case 'message_read':
                 this.emit('message_read', {
                     ...rest.data,
+                    action: action,
                     // 确保ID是字符串
-                    message_id: String(rest.data.message_id),
-                    reader_id: String(rest.data.reader_id)
+                    message_id: String(rest.data?.message_id),
+                    reader_id: String(rest.data?.reader_id)
                 });
                 break;
             case 'message_recalled':
                 this.emit('message_recalled', {
                     ...rest.data,
+                    action: action,
                     // 确保ID是字符串
-                    message_id: String(rest.data.message_id),
-                    recalled_by: String(rest.data.recalled_by)
+                    message_id: String(rest.data?.message_id),
+                    recalled_by: String(rest.data?.recalled_by)
                 });
                 break;
             case 'not_friend':  // 新增处理
                 // 处理不同可能的数据结构
-                { const notFriendData = rest.data || rest;
+            { const notFriendData = rest.data || rest;
 
                 // 确保我们有 client_msg_id
                 const clientMsgId = notFriendData.client_msg_id ||
@@ -225,6 +276,7 @@ class WebSocketManager {
 
                 this.emit('not_friend', {
                     ...notFriendData,
+                    action: action,
                     // 确保 ID 是字符串
                     client_msg_id: clientMsgId ? String(clientMsgId) : null,
                     sender_id: notFriendData.sender_id ? String(notFriendData.sender_id) : null,
@@ -235,13 +287,15 @@ class WebSocketManager {
             case 'user_typing':
                 this.emit('user_typing', {
                     ...rest.data,
+                    action: action,
                     // 确保ID是字符串
-                    sender_id: String(rest.data.sender_id),
-                    receiver_id: String(rest.data.receiver_id)
+                    sender_id: String(rest.data?.sender_id),
+                    receiver_id: String(rest.data?.receiver_id)
                 });
                 break;
             case 'pong':
                 console.log('收到心跳响应');
+                this.lastHeartbeatTime = Date.now();
                 break;
             case 'auth_success':
                 this.emit('auth_success', rest);
@@ -265,6 +319,7 @@ class WebSocketManager {
         }
         this.listeners.clear();
         this.stopHeartbeat();
+        this.stopConnectionCheck();
         this.emit('connection_status', 'disconnected');
     }
 

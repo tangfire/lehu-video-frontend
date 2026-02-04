@@ -19,6 +19,8 @@ const ChatRoom = () => {
     const [page, setPage] = useState(1);
     const [loadingMore, setLoadingMore] = useState(false);
     const [error, setError] = useState(null);
+    const [connectionStatus, setConnectionStatus] = useState('connecting');
+    const [showDebugInfo, setShowDebugInfo] = useState(false);
 
     const params = useParams();
     const { type, targetId: paramTargetId } = params;
@@ -30,6 +32,9 @@ const ChatRoom = () => {
     const currentUser = getCurrentUser();
     const navigate = useNavigate();
     const lastFetchRef = useRef(0);
+    const initializedRef = useRef(false);
+    const pendingMessagesRef = useRef(new Map()); // 存储待处理的消息
+    const reconnectAttemptRef = useRef(0);
 
     // WebSocket相关功能
     const {
@@ -38,7 +43,11 @@ const ChatRoom = () => {
         sendReadReceipt: wsSendReadReceipt,
         recallMessage: wsRecallMessage,
         isTyping: wsIsTyping,
-        messageStatusUpdates
+        messageStatusUpdates,
+        onMessage,
+        offMessage,
+        isConnected,
+        reconnect
     } = useWebSocket();
 
     // 聊天上下文
@@ -55,20 +64,34 @@ const ChatRoom = () => {
     // 确定最终的conversationId
     const conversationId = stateConversationId;
 
-    // 防抖函数
-    const debounce = (func, wait) => {
-        let timeout;
-        return function executedFunction(...args) {
-            const later = () => {
-                clearTimeout(timeout);
-                func(...args);
-            };
-            clearTimeout(timeout);
-            timeout = setTimeout(later, wait);
-        };
-    };
+    // 监听WebSocket连接状态
+    useEffect(() => {
+        const checkConnection = () => {
+            const status = isConnected() ? 'connected' : 'disconnected';
+            setConnectionStatus(status);
 
-    // 获取会话详情 - 优化版本
+            // 如果断开连接，尝试重连
+            if (status === 'disconnected' && reconnectAttemptRef.current < 3) {
+                reconnectAttemptRef.current += 1;
+                setTimeout(() => {
+                    console.log('尝试重新连接WebSocket...');
+                    reconnect();
+                }, 2000 * reconnectAttemptRef.current);
+            } else if (status === 'connected') {
+                reconnectAttemptRef.current = 0;
+            }
+        };
+
+        // 初始检查
+        checkConnection();
+
+        // 定期检查连接状态
+        const interval = setInterval(checkConnection, 5000);
+
+        return () => clearInterval(interval);
+    }, [isConnected, reconnect]);
+
+    // 获取会话详情
     const fetchConversationDetail = useCallback(async (force = false) => {
         if (!conversationId) {
             console.error('没有会话ID');
@@ -116,14 +139,14 @@ const ChatRoom = () => {
         }
     }, [conversationId, getCachedConversation, cacheConversation]);
 
-    // 获取目标信息 - 优化版本
+    // 获取目标信息
     const fetchTargetInfo = useCallback(async () => {
         if (!conversation) return;
 
         try {
             console.log('正在获取目标信息，conversation:', conversation);
 
-            if (conversation.type === 0) { // 单聊
+            if (conversation.type === 0) {
                 const otherMemberId = conversation.member_ids?.find(
                     memberId => String(memberId) !== String(currentUser.id)
                 );
@@ -139,7 +162,6 @@ const ChatRoom = () => {
                     return;
                 }
 
-                // 检查缓存
                 const cacheKey = `user_${otherMemberId}`;
                 const cachedUser = getCachedUser(otherMemberId);
                 if (cachedUser) {
@@ -148,7 +170,6 @@ const ChatRoom = () => {
                     return;
                 }
 
-                // 检查是否需要重新获取
                 if (!shouldRefetch(cacheKey, 30000)) {
                     console.log('跳过用户信息获取，缓存有效');
                     return;
@@ -171,14 +192,13 @@ const ChatRoom = () => {
                     }
                 } catch (error) {
                     console.error('获取用户信息失败:', error);
-                    // 使用回退信息
                     setTargetInfo({
                         id: String(otherMemberId),
                         name: conversation.name || `用户${otherMemberId}`,
                         avatar: conversation.avatar || '/default-avatar.png'
                     });
                 }
-            } else { // 群聊
+            } else {
                 const groupId = conversation.group_id || conversation.target_id;
                 console.log('群聊ID:', groupId);
 
@@ -191,7 +211,6 @@ const ChatRoom = () => {
                     return;
                 }
 
-                // 检查缓存
                 const cacheKey = `group_${groupId}`;
                 const cachedGroup = getCachedGroup(groupId);
                 if (cachedGroup) {
@@ -200,7 +219,6 @@ const ChatRoom = () => {
                     return;
                 }
 
-                // 检查是否需要重新获取
                 if (!shouldRefetch(cacheKey, 30000)) {
                     console.log('跳过群组信息获取，缓存有效');
                     return;
@@ -237,9 +255,18 @@ const ChatRoom = () => {
 
     // 获取消息历史
     const fetchMessages = useCallback(async (pageNum = 1, referenceId = "0") => {
-        if (!conversationId) return;
+        if (!conversationId) {
+            console.error('没有会话ID，无法获取消息');
+            return;
+        }
 
         try {
+            console.log('正在获取消息，参数:', {
+                conversationId,
+                pageNum,
+                referenceId
+            });
+
             if (pageNum === 1) {
                 setIsLoading(true);
             } else {
@@ -252,32 +279,36 @@ const ChatRoom = () => {
                 20
             );
 
-            if (response && response.messages) {
-                const formattedMessages = (response.messages || []).map(msg => ({
-                    ...msg,
-                    id: String(msg.id),
-                    sender_id: String(msg.sender_id),
-                    receiver_id: String(msg.receiver_id),
-                    conversation_id: String(msg.conversation_id),
-                    status: msg.status || 0
-                }));
+            console.log('消息API响应:', response);
 
-                // ✅ 修复：历史消息加在前面，新消息在后面
-                if (pageNum === 1) {
-                    // 第一次加载，直接设置
-                    setMessages(formattedMessages);
-                } else {
-                    // 加载更多历史消息，应该加在列表前面
-                    setMessages(prev => {
-                        const existingIds = new Set(formattedMessages.map(m => String(m.id)));
-                        const existingMessages = prev.filter(m => !existingIds.has(String(m.id)));
-                        return [...formattedMessages, ...existingMessages];
-                    });
-                }
-
-                setHasMore(response.has_more || false);
-                setPage(pageNum);
+            if (!response || !response.messages) {
+                console.error('获取消息返回格式错误:', response);
+                return;
             }
+
+            const formattedMessages = (response.messages || []).map(msg => ({
+                ...msg,
+                id: String(msg.id),
+                sender_id: String(msg.sender_id),
+                receiver_id: String(msg.receiver_id),
+                conversation_id: String(msg.conversation_id),
+                status: msg.status || 0
+            }));
+
+            console.log('格式化后的消息:', formattedMessages);
+
+            if (pageNum === 1) {
+                setMessages(formattedMessages);
+            } else {
+                setMessages(prev => {
+                    const existingIds = new Set(formattedMessages.map(m => String(m.id)));
+                    const existingMessages = prev.filter(m => !existingIds.has(String(m.id)));
+                    return [...formattedMessages, ...existingMessages];
+                });
+            }
+
+            setHasMore(response.has_more || false);
+            setPage(pageNum);
         } catch (error) {
             console.error('获取消息失败:', error);
         } finally {
@@ -286,65 +317,7 @@ const ChatRoom = () => {
         }
     }, [conversationId]);
 
-    // 从useWebSocket中获取新消息处理函数
-    const { onMessage, offMessage } = useWebSocket();
-
-// 监听新消息
-    useEffect(() => {
-        if (!conversationId) return;
-
-        const handleNewMessage = (message) => {
-            console.log('收到WebSocket新消息:', message);
-
-            // 检查消息是否属于当前会话
-            if (String(message.conversation_id) !== String(conversationId)) {
-                return;
-            }
-
-            // 格式化消息
-            const formattedMessage = {
-                ...message,
-                id: String(message.id),
-                sender_id: String(message.sender_id),
-                receiver_id: String(message.receiver_id),
-                conversation_id: String(message.conversation_id),
-                status: message.status || 1 // 默认已发送
-            };
-
-            // 检查是否已存在此消息
-            setMessages(prev => {
-                const existingIds = new Set(prev.map(m => String(m.id)));
-                if (existingIds.has(String(formattedMessage.id))) {
-                    // 已存在，更新状态
-                    return prev.map(m =>
-                        String(m.id) === String(formattedMessage.id)
-                            ? { ...m, ...formattedMessage }
-                            : m
-                    );
-                } else {
-                    // 新消息，添加到列表末尾
-                    return [...prev, formattedMessage];
-                }
-            });
-
-            // 滚动到底部
-            setTimeout(scrollToBottom, 50);
-        };
-
-        // 注册监听器
-        onMessage(handleNewMessage);
-
-        // 清理函数
-        return () => {
-            offMessage(handleNewMessage);
-        };
-    }, [conversationId, onMessage, offMessage]);
-
-
-    // 使用 useRef 来跟踪是否已经初始化
-    const initializedRef = useRef(false);
-
-    // 初始化会话 - 防抖版本
+    // 初始化会话
     const initializeConversation = useCallback(() => {
         if (!conversationId || initializedRef.current) return;
 
@@ -356,7 +329,7 @@ const ChatRoom = () => {
             setConversation(initialConversation);
             cacheConversation(initialConversation);
 
-            // 立即获取消息，不使用 setTimeout
+            // 获取消息
             fetchMessages(1, "0");
             return;
         }
@@ -365,11 +338,196 @@ const ChatRoom = () => {
         fetchConversationDetail();
     }, [conversationId, initialConversation, fetchConversationDetail, cacheConversation, fetchMessages]);
 
-    // 在组件卸载时重置初始化状态
-    useEffect(() => {
-        return () => {
-            initializedRef.current = false;
+    // 处理WebSocket新消息 - 优化版
+    const handleWebSocketMessage = useCallback((message) => {
+        console.log('🎯 收到WebSocket新消息:', {
+            message,
+            currentConversationId: conversationId,
+            messageConversationId: message.conversation_id,
+            type: message.type || 'unknown'
+        });
+
+        // 更宽松的消息检查逻辑
+        const messageConvId = message.conversation_id || message.conversationId;
+        const currentConvId = conversationId;
+
+        // 检查消息是否属于当前会话
+        const isCurrentConversation =
+            // 情况1：消息有会话ID且匹配当前会话
+            (messageConvId && currentConvId && String(messageConvId) === String(currentConvId)) ||
+            // 情况2：消息没有会话ID，但接收者是当前用户
+            (!messageConvId && String(message.receiver_id) === String(currentUser?.id)) ||
+            // 情况3：消息没有会话ID，但发送者是目标用户（单聊）
+            (!messageConvId && String(message.sender_id) === String(paramTargetId)) ||
+            // 情况4：消息是系统消息
+            message.type === 'system' ||
+            // 情况5：消息是撤回通知
+            message.action === 'message_recalled';
+
+        if (!isCurrentConversation) {
+            console.log('⏭️ 消息不属于当前会话，跳过', {
+                messageConvId,
+                currentConvId,
+                sender: message.sender_id,
+                receiver: message.receiver_id
+            });
+
+            // 如果是撤回通知，但属于当前会话的消息
+            if (message.action === 'message_recalled' && message.data?.conversation_id === currentConvId) {
+                // 仍然处理撤回消息
+                console.log('处理当前会话的撤回消息');
+            } else {
+                return;
+            }
+        }
+
+        // 处理不同的消息类型
+        switch (message.action) {
+            case 'receive_message':
+            case 'new_message':
+                handleNewMessage(message);
+                break;
+            case 'message_sent':
+                handleMessageSent(message);
+                break;
+            case 'message_delivered':
+                handleMessageDelivered(message);
+                break;
+            case 'message_read':
+                handleMessageRead(message);
+                break;
+            case 'message_recalled':
+                handleMessageRecalled(message);
+                break;
+            case 'user_typing':
+                handleUserTyping(message);
+                break;
+            default:
+                console.log('未知消息类型:', message.action);
+        }
+    }, [conversationId, currentUser, paramTargetId]);
+
+    // 处理新消息
+    const handleNewMessage = useCallback((message) => {
+        // 格式化消息
+        const formattedMessage = {
+            ...message.data || message,
+            id: String(message.data?.id || message.id || message.message_id),
+            sender_id: String(message.data?.sender_id || message.sender_id),
+            receiver_id: String(message.data?.receiver_id || message.receiver_id),
+            conversation_id: String(message.data?.conversation_id || message.conversation_id),
+            status: message.data?.status || message.status || 2, // 默认已送达
+            created_at: message.data?.created_at || message.created_at || new Date().toISOString()
         };
+
+        console.log('📝 格式化后的新消息:', formattedMessage);
+
+        // 添加到消息列表
+        setMessages(prev => {
+            const existingIds = new Set(prev.map(m => String(m.id)));
+            if (existingIds.has(String(formattedMessage.id))) {
+                // 已存在，更新状态
+                console.log('🔄 消息已存在，更新状态');
+                return prev.map(m =>
+                    String(m.id) === String(formattedMessage.id)
+                        ? { ...m, ...formattedMessage }
+                        : m
+                );
+            } else {
+                // 新消息，添加到列表末尾
+                console.log('➕ 添加新消息到列表');
+                return [...prev, formattedMessage];
+            }
+        });
+
+        // 滚动到底部
+        setTimeout(scrollToBottom, 50);
+
+        // 发送已读回执
+        if (String(formattedMessage.sender_id) !== String(currentUser?.id)) {
+            wsSendReadReceipt(conversationId, formattedMessage.id);
+        }
+    }, [conversationId, currentUser, wsSendReadReceipt]);
+
+    // 处理消息发送成功
+    const handleMessageSent = useCallback((message) => {
+        console.log('✅ 消息发送成功:', message);
+
+        const data = message.data || message;
+        const tempId = data.client_msg_id;
+        const serverId = data.message_id;
+
+        if (tempId && serverId) {
+            // 更新临时消息的ID
+            setMessages(prev => prev.map(msg => {
+                if (msg.id === tempId || msg.client_msg_id === tempId) {
+                    return {
+                        ...msg,
+                        id: String(serverId),
+                        status: 1, // 已发送
+                        message_id: String(serverId)
+                    };
+                }
+                return msg;
+            }));
+        }
+    }, []);
+
+    // 处理消息已送达
+    const handleMessageDelivered = useCallback((message) => {
+        console.log('📨 消息已送达:', message);
+
+        const data = message.data || message;
+        const messageId = data.message_id;
+
+        if (messageId) {
+            setMessages(prev => prev.map(msg => {
+                if (String(msg.id) === String(messageId)) {
+                    return { ...msg, status: 2 }; // 已送达
+                }
+                return msg;
+            }));
+        }
+    }, []);
+
+    // 处理消息已读
+    const handleMessageRead = useCallback((message) => {
+        console.log('👁️ 消息已读:', message);
+
+        const data = message.data || message;
+        const messageId = data.message_id;
+
+        if (messageId) {
+            setMessages(prev => prev.map(msg => {
+                if (String(msg.id) === String(messageId)) {
+                    return { ...msg, status: 3 }; // 已读
+                }
+                return msg;
+            }));
+        }
+    }, []);
+
+    // 处理消息撤回
+    const handleMessageRecalled = useCallback((message) => {
+        console.log('↩️ 消息撤回:', message);
+
+        const data = message.data || message;
+        const messageId = data.message_id;
+
+        if (messageId) {
+            setMessages(prev => prev.map(msg => {
+                if (String(msg.id) === String(messageId)) {
+                    return { ...msg, is_recalled: true, status: 4 }; // 已撤回
+                }
+                return msg;
+            }));
+        }
+    }, []);
+
+    // 处理用户正在输入
+    const handleUserTyping = useCallback((message) => {
+        console.log('⌨️ 用户正在输入:', message);
+        // 这里可以设置显示"对方正在输入"的UI
     }, []);
 
     // 初始化
@@ -381,55 +539,77 @@ const ChatRoom = () => {
     useEffect(() => {
         if (!conversation) return;
 
-        // 防抖获取目标信息
         const timeoutId = setTimeout(() => {
             fetchTargetInfo();
         }, 200);
 
-        // 如果conversation变化，获取消息
-        if (!messages.length) {
-            fetchMessages(1, "0");
-        }
-
         return () => clearTimeout(timeoutId);
-    }, [conversation, fetchTargetInfo, fetchMessages, messages.length]);
+    }, [conversation, fetchTargetInfo]);
+
+    // 监听WebSocket消息和状态更新
+    useEffect(() => {
+        if (!conversationId) return;
+
+        console.log('🎧 开始监听WebSocket消息，会话ID:', conversationId);
+
+        // 注册监听器
+        onMessage(handleWebSocketMessage);
+
+        // 清理函数
+        return () => {
+            console.log('🧹 清理WebSocket监听器');
+            offMessage(handleWebSocketMessage);
+        };
+    }, [conversationId, onMessage, offMessage, handleWebSocketMessage]);
 
     // WebSocket状态更新处理
     useEffect(() => {
         if (messageStatusUpdates.size === 0) return;
 
+        console.log('📊 处理消息状态更新:', messageStatusUpdates);
+
         let hasChanges = false;
         const updatedMessages = messages.map(msg => {
-            const update = messageStatusUpdates.get(String(msg.id));
+            // 检查临时消息ID
+            const tempUpdate = msg.client_msg_id ? messageStatusUpdates.get(String(msg.client_msg_id)) : null;
+            // 检查正式消息ID
+            const update = messageStatusUpdates.get(String(msg.id)) || tempUpdate;
+
             if (!update) return msg;
 
             const newMsg = { ...msg };
 
-            // 处理ID升级
+            // 处理ID升级（临时消息ID转正式ID）
             if (String(msg.id).startsWith('temp_') && update.message_id) {
                 newMsg.id = String(update.message_id);
                 hasChanges = true;
+                console.log('🆔 更新消息ID:', { old: msg.id, new: newMsg.id });
             }
 
             // 处理状态更新
             if (update.status !== undefined && newMsg.status !== update.status) {
                 newMsg.status = update.status;
                 hasChanges = true;
+                console.log('🔄 更新消息状态:', { id: newMsg.id, oldStatus: msg.status, newStatus: update.status });
             }
 
             return newMsg;
         });
 
         if (hasChanges) {
+            console.log('✅ 应用消息状态更新');
             setMessages(updatedMessages);
         }
     }, [messageStatusUpdates, messages]);
 
     // 滚动到底部
     const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        if (messagesEndRef.current) {
+            messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
     };
 
+    // 消息变化时滚动到底部
     useEffect(() => {
         if (messages.length > 0) {
             setTimeout(scrollToBottom, 100);
@@ -443,46 +623,92 @@ const ChatRoom = () => {
             return;
         }
 
+        // 确定接收者
+        let receiverId;
+        let convType;
+
+        if (conversation.type === 0) {
+            const otherMember = conversation.member_ids?.find(
+                memberId => String(memberId) !== String(currentUser.id)
+            );
+            if (!otherMember) {
+                console.error('无法确定接收者');
+                return;
+            }
+            receiverId = String(otherMember);
+            convType = 0;
+        } else {
+            receiverId = String(conversation.group_id || conversation.target_id);
+            convType = 1;
+        }
+
         // 生成客户端消息ID
         const clientMsgId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+
+        const messagePayload = {
+            conversation_id: String(conversation.id),
+            receiver_id: receiverId,
+            conv_type: convType,
+            msg_type: 0,
+            content: { text: inputMessage.trim() },
+            client_msg_id: clientMsgId
+        };
+
+        console.log('📤 发送消息 payload:', messagePayload);
+
+        // 检查WebSocket连接
+        if (!isConnected()) {
+            console.error('WebSocket未连接，无法发送消息');
+            alert('连接已断开，请刷新页面重试');
+            return;
+        }
 
         // 临时消息
         const tempMessage = {
             id: clientMsgId,
             sender_id: String(currentUser.id),
-            receiver_id: String(receiverId),
+            receiver_id: receiverId,
             conversation_id: String(conversationId),
             conv_type: convType,
             msg_type: 0,
             content: { text: inputMessage.trim() },
-            status: 0, // 发送中
+            status: 0,
             is_recalled: false,
             created_at: new Date().toISOString(),
-            is_temp: true // 标记为临时消息
+            client_msg_id: clientMsgId
         };
 
-        console.log('添加临时消息:', tempMessage);
-        setMessages(prev => [...prev, tempMessage]); // 添加到末尾
+        console.log('➕ 添加临时消息:', tempMessage);
+        setMessages(prev => [...prev, tempMessage]);
         setInputMessage('');
-
-        // 立即滚动到底部
-        setTimeout(scrollToBottom, 50);
 
         // 通过WebSocket发送
         const success = wsSendMessage(messagePayload);
         if (!success) {
-            console.error('WebSocket发送失败');
-            // 标记为发送失败
+            console.error('❌ WebSocket发送失败');
             setMessages(prev => prev.map(msg =>
                 msg.id === clientMsgId ? { ...msg, status: 99 } : msg
             ));
+            alert('消息发送失败，请检查网络连接');
         }
+
+        scrollToBottom();
     };
 
     // 处理输入变化
     const handleInputChange = (e) => {
         const value = e.target.value;
         setInputMessage(value);
+
+        // 可选：发送正在输入状态
+        if (conversation && targetInfo) {
+            wsSendTypingStatus(
+                targetInfo.id,
+                conversation.type || 0,
+                value.length > 0,
+                value
+            );
+        }
     };
 
     // 处理按键事件
@@ -524,7 +750,6 @@ const ChatRoom = () => {
     const handleScroll = () => {
         if (messageContainerRef.current) {
             const { scrollTop, scrollHeight, clientHeight } = messageContainerRef.current;
-            // 当滚动到顶部时加载更多
             if (scrollTop < 100 && hasMore && !loadingMore) {
                 handleLoadMore();
             }
@@ -570,13 +795,20 @@ const ChatRoom = () => {
         fetchConversationDetail(true);
     };
 
-    // 检查对方是否正在输入
-    const isTargetTyping = useMemo(() => {
-        if (!targetInfo || !conversation) return false;
+    // 调试信息
+    const renderDebugInfo = () => {
+        if (!showDebugInfo) return null;
 
-        const typingKey = `${String(targetInfo.id)}_${String(conversation.id)}`;
-        return wsIsTyping && wsIsTyping(String(targetInfo.id), String(conversation.id));
-    }, [targetInfo, conversation, wsIsTyping]);
+        return (
+            <div className="debug-info">
+                <p>会话ID: {conversationId}</p>
+                <p>连接状态: {connectionStatus}</p>
+                <p>消息数量: {messages.length}</p>
+                <p>目标用户: {targetInfo?.id}</p>
+                <p>当前用户: {currentUser?.id}</p>
+            </div>
+        );
+    };
 
     // 如果没有conversationId，显示错误
     if (!conversationId) {
@@ -607,18 +839,20 @@ const ChatRoom = () => {
         );
     }
 
-    console.log('当前状态:', {
+    console.log('📊 当前状态:', {
         isLoading,
         messagesCount: messages.length,
         hasMore,
         loadingMore,
         conversation: conversation ? '已加载' : '未加载',
         targetInfo: targetInfo ? '已加载' : '未加载',
-        isTargetTyping
+        connectionStatus
     });
 
     return (
         <div className="chat-room">
+            {renderDebugInfo()}
+
             <div className="chat-header">
                 <button className="back-btn" onClick={() => navigate(-1)}>
                     ←
@@ -639,7 +873,7 @@ const ChatRoom = () => {
                                 <p className="chat-status">
                                     {conversation?.type === 1 ?
                                         `成员: ${conversation.member_count || 0}` :
-                                        '在线'}
+                                        connectionStatus === 'connected' ? '在线' : '离线'}
                                 </p>
                             </div>
                         </>
@@ -656,8 +890,12 @@ const ChatRoom = () => {
                     )}
                 </div>
                 <div className="chat-header-actions">
-                    <button className="chat-action-btn">
-                        <span>···</span>
+                    <button
+                        className="chat-action-btn"
+                        onClick={() => setShowDebugInfo(!showDebugInfo)}
+                        title="调试信息"
+                    >
+                        🔧
                     </button>
                 </div>
             </div>
@@ -689,6 +927,11 @@ const ChatRoom = () => {
                         <div className="no-messages">
                             <div className="no-messages-icon">💬</div>
                             <p>还没有消息，开始聊天吧！</p>
+                            <p className="connection-hint">
+                                {connectionStatus === 'connected' ?
+                                    '连接正常 ✓' :
+                                    `连接状态: ${connectionStatus}，消息可能无法实时接收`}
+                            </p>
                         </div>
                     ) : (
                         messages.map((message) => {
@@ -754,15 +997,6 @@ const ChatRoom = () => {
                     )}
                     <div ref={messagesEndRef} />
                 </div>
-
-                {isTargetTyping && (
-                    <div className="typing-indicator">
-                        <span className="typing-dot"></span>
-                        <span className="typing-dot"></span>
-                        <span className="typing-dot"></span>
-                        <span className="typing-text">对方正在输入...</span>
-                    </div>
-                )}
             </div>
 
             <div className="chat-input-container">
@@ -779,18 +1013,19 @@ const ChatRoom = () => {
                 </div>
                 <textarea
                     className="chat-input"
-                    placeholder="输入消息..."
+                    placeholder={connectionStatus === 'connected' ? "输入消息..." : "连接断开，请刷新页面"}
                     value={inputMessage}
                     onChange={handleInputChange}
                     onKeyPress={handleKeyPress}
                     rows={3}
+                    disabled={connectionStatus !== 'connected'}
                 />
                 <button
                     className="chat-send-btn"
                     onClick={handleSendMessage}
-                    disabled={!inputMessage.trim()}
+                    disabled={!inputMessage.trim() || connectionStatus !== 'connected'}
                 >
-                    发送
+                    {connectionStatus === 'connected' ? '发送' : '连接中...'}
                 </button>
             </div>
         </div>

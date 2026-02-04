@@ -33,6 +33,14 @@ export const webSocketAPI = {
     // 监听新消息
     onMessage: (callback) => {
         websocketManager.on('new_message', callback);
+        // 同时监听 receive_message 事件
+        websocketManager.on('receive_message', callback);
+    },
+
+    // 移除新消息监听
+    offMessage: (callback) => {
+        websocketManager.off('new_message', callback);
+        websocketManager.off('receive_message', callback);
     },
 
     // 监听消息发送成功
@@ -44,7 +52,6 @@ export const webSocketAPI = {
     onMessageDelivered: (callback) => {
         websocketManager.on('message_delivered', callback);
     },
-
 
     // 监听消息已读
     onMessageRead: (callback) => {
@@ -66,8 +73,6 @@ export const webSocketAPI = {
         websocketManager.on('notification', callback);
     },
 
-    // 在 webSocketAPI 对象中添加以下方法：
-
     // 监听非好友关系错误
     onNotFriend: (callback) => {
         websocketManager.on('not_friend', callback);
@@ -78,14 +83,12 @@ export const webSocketAPI = {
         websocketManager.off('not_friend', callback);
     },
 
-
-
     // 监听认证成功
     onAuthSuccess: (callback) => {
         websocketManager.on('auth_success', callback);
     },
 
-    // 监听连接状态 - 简化版本
+    // 监听连接状态
     onConnectionStatus: (callback) => {
         websocketManager.on('connection_status', callback);
         websocketManager.on('connection_established', () => callback('connected'));
@@ -100,10 +103,6 @@ export const webSocketAPI = {
     },
 
     // 移除监听器方法
-    offMessage: (callback) => {
-        websocketManager.off('new_message', callback);
-    },
-
     offMessageSent: (callback) => {
         websocketManager.off('message_sent', callback);
     },
@@ -144,5 +143,13 @@ export const webSocketAPI = {
 
     getConnectionStatus: () => {
         return websocketManager.getConnectionStatus();
+    },
+
+    // 重新连接
+    reconnect: () => {
+        const token = localStorage.getItem('token');
+        if (token) {
+            websocketManager.reconnect();
+        }
     }
 };

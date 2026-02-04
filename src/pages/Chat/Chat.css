@@ -1092,3 +1092,28 @@
     padding: 0 2px;
     border-radius: 2px;
 }
+
+
+/* 调试信息样式 */
+.debug-info {
+    background: #333;
+    color: #fff;
+    padding: 8px 15px;
+    font-size: 12px;
+    text-align: left;
+    border-bottom: 1px solid #444;
+    max-height: 150px;
+    overflow-y: auto;
+}
+
+.debug-info p {
+    margin: 4px 0;
+    font-family: monospace;
+}
+
+/* 连接提示 */
+.connection-hint {
+    font-size: 12px;
+    color: #666;
+    margin-top: 10px;
+}
