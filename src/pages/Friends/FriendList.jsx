@@ -1,6 +1,8 @@
+// pages/Friends/FriendList.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { friendApi } from '../../api/friend';
+import { messageApi } from '../../api/message';
 import SearchUsers from '../../components/User/SearchUsers';
 import { getCurrentUser } from '../../api/user';
 import './Friends.css';
@@ -9,7 +11,7 @@ const FriendList = () => {
     const [friends, setFriends] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
-    const [activeGroup, setActiveGroup] = useState('all'); // 'all', 'recent', 'groups'
+    const [activeGroup, setActiveGroup] = useState('all');
     const [friendGroups, setFriendGroups] = useState([]);
     const [onlineStatus, setOnlineStatus] = useState({});
     const [showSearch, setShowSearch] = useState(false);
@@ -153,7 +155,7 @@ const FriendList = () => {
     // 更新好友备注
     const handleUpdateRemark = async (friendId, currentRemark) => {
         const newRemark = prompt('请输入新的备注：', currentRemark || '');
-        if (newRemark === null) return; // 用户取消
+        if (newRemark === null) return;
 
         try {
             await friendApi.updateFriendRemark(friendId, newRemark);
@@ -201,9 +203,28 @@ const FriendList = () => {
         }
     };
 
-    // 发起聊天
-    const handleStartChat = (friendId) => {
-        navigate(`/chat/single/${friendId}`);
+    // 发起聊天（关键修改：先创建/获取会话，再跳转）
+    const handleStartChat = async (friendId) => {
+        try {
+            const response = await messageApi.createConversation(friendId, 0, '');
+            if (response && response.conversation_id) {
+                navigate(`/chat/single/${friendId}`, {
+                    state: {
+                        conversationId: response.conversation_id,
+                        conversation: {
+                            id: response.conversation_id,
+                            type: 0,
+                            target_id: friendId
+                        }
+                    }
+                });
+            } else {
+                throw new Error('创建会话失败');
+            }
+        } catch (error) {
+            console.error('发起聊天失败:', error);
+            alert('发起聊天失败，请重试');
+        }
     };
 
     // 获取在线状态文本
@@ -219,10 +240,10 @@ const FriendList = () => {
     // 获取在线状态颜色
     const getOnlineStatusColor = (status) => {
         switch (status) {
-            case 1: return '#4CAF50'; // 绿色 - 在线
-            case 2: return '#F44336'; // 红色 - 忙碌
-            case 3: return '#FF9800'; // 橙色 - 离开
-            default: return '#9E9E9E'; // 灰色 - 离线
+            case 1: return '#4CAF50';
+            case 2: return '#F44336';
+            case 3: return '#FF9800';
+            default: return '#9E9E9E';
         }
     };
 
@@ -268,7 +289,6 @@ const FriendList = () => {
 
     // 搜索用户回调
     const handleUserSelect = (user) => {
-        // 跳转到用户主页
         navigate(`/user/${user.id}`);
     };
 
@@ -360,8 +380,8 @@ const FriendList = () => {
                             {group}
                             {group !== '全部' && (
                                 <span className="group-count">
-                  ({friends.filter(f => f.group_name === group).length})
-                </span>
+                                    ({friends.filter(f => f.group_name === group).length})
+                                </span>
                             )}
                         </button>
                     ))}
@@ -388,7 +408,6 @@ const FriendList = () => {
                             const friendName = friend.remark || friend.friend?.name || friend.name || '未知用户';
                             const friendAvatar = friend.friend?.avatar || friend.avatar || '/default-avatar.png';
                             const originalName = friend.friend?.name || friend.name;
-                            const isOnline = onlineStatus[friendId] === 1;
                             const statusColor = getOnlineStatusColor(onlineStatus[friendId]);
 
                             return (
@@ -411,8 +430,8 @@ const FriendList = () => {
                                             <h4>{friendName}</h4>
                                             {friend.remark && originalName && friend.remark !== originalName && (
                                                 <span className="original-name">
-                          ({originalName})
-                        </span>
+                                                    ({originalName})
+                                                </span>
                                             )}
                                         </div>
 

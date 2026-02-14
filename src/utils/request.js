@@ -17,24 +17,27 @@ const requestTimers = new Map();
 
 // 生成请求唯一标识
 const generateRequestKey = (config) => {
-    // 对于需要实时更新的请求，不进行防重（聊天相关）
     const url = config.url || '';
     const method = config.method || 'get';
+    const methodLower = method.toLowerCase();
 
-    // 检查是否是聊天相关请求
-    const isChatRequest = url.includes('/conversations') ||
-        url.includes('/messages') ||
-        (url.includes('/conversation') && method.toLowerCase() === 'post');
+    // 定义读操作的 URL 关键词（可根据实际接口扩展）
+    const readUrlPatterns = [
+        '/video/feed',
+        '/video/list',
+        '/comment/video',
+        '/comment/child',
+        '/collection/list',
+        // 如果有其他读接口，继续添加
+    ];
+    const isReadUrl = readUrlPatterns.some(pattern => url.includes(pattern));
 
-    // 检查是否是视频流请求
-    const isVideoFeed = url.includes('/video/feed');
-
-    // 对于这些实时请求，不进行防重处理
-    if (isChatRequest || isVideoFeed) {
+    // 如果是 GET 请求，或 URL 匹配读操作列表 → 视为读请求，每次生成唯一 key
+    if (methodLower === 'get' || isReadUrl) {
         return `${method}_${url}_${Date.now()}_${Math.random()}`;
     }
 
-    // 其他请求使用原有逻辑
+    // 写操作：使用原有防重逻辑（相同 key 的请求会被取消）
     const dataStr = config.data ? JSON.stringify(config.data) : '';
     const paramsStr = config.params ? JSON.stringify(config.params) : '';
     return `${method}_${url}_${dataStr}_${paramsStr}`;

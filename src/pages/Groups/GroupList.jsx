@@ -1,5 +1,6 @@
+// pages/Groups/GroupList.jsx
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { groupApi } from '../../api/group';
 import { messageApi } from '../../api/message';
 import './Groups.css';
@@ -23,20 +24,12 @@ const GroupList = () => {
         try {
             setLoading(true);
             let response;
-
             if (type === 'joined') {
-                response = await groupApi.listMyJoinedGroups({
-                    page: 1,
-                    page_size: 50
-                });
-            } else if (type === 'created') {
-                response = await groupApi.loadMyGroup({
-                    page: 1,
-                    page_size: 50
-                });
+                response = await groupApi.listMyJoinedGroups({ page: 1, page_size: 50 });
+            } else {
+                response = await groupApi.loadMyGroup({ page: 1, page_size: 50 });
             }
-
-            if (response && response.groups) {
+            if (response?.groups) {
                 setGroups(response.groups);
             }
         } catch (error) {
@@ -47,9 +40,7 @@ const GroupList = () => {
     }, []);
 
     // 搜索群组
-    const handleSearch = (query) => {
-        setSearchQuery(query);
-    };
+    const handleSearch = (query) => setSearchQuery(query);
 
     // 创建群组
     const handleCreateGroup = async () => {
@@ -57,30 +48,28 @@ const GroupList = () => {
             alert('请输入群组名称');
             return;
         }
-
         try {
             const response = await groupApi.createGroup(newGroupData);
-
-            if (response && response.group_id) {
+            if (response?.group_id) {
                 alert('群组创建成功！');
                 setCreatingGroup(false);
-                setNewGroupData({
-                    name: '',
-                    notice: '',
-                    add_mode: 0,
-                    avatar: ''
-                });
-
-                // 刷新群组列表
-                fetchGroups('created');
-
+                setNewGroupData({ name: '', notice: '', add_mode: 0, avatar: '' });
+                // 刷新列表
+                await fetchGroups('created');
                 // 创建会话并跳转到群聊
-                const convResponse = await messageApi.createConversation(
-                    response.group_id,
-                    1,
-                    '欢迎加入群聊！'
-                );
-                navigate(`/chat/group/${response.group_id}`);
+                const convResponse = await messageApi.createConversation(response.group_id, 1, '欢迎加入群聊！');
+                if (convResponse?.conversation_id) {
+                    navigate(`/chat/group/${response.group_id}`, {
+                        state: {
+                            conversationId: convResponse.conversation_id,
+                            conversation: {
+                                id: convResponse.conversation_id,
+                                type: 1,
+                                target_id: response.group_id
+                            }
+                        }
+                    });
+                }
             }
         } catch (error) {
             console.error('创建群组失败:', error);
@@ -94,6 +83,7 @@ const GroupList = () => {
             if (addMode === 0) {
                 await groupApi.enterGroupDirectly(groupId);
                 alert('加入群组成功！');
+                fetchGroups('joined');
             } else {
                 const reason = prompt('请输入申请理由：');
                 if (reason !== null) {
@@ -101,8 +91,6 @@ const GroupList = () => {
                     alert('申请已提交，等待管理员审核');
                 }
             }
-
-            fetchGroups('joined');
         } catch (error) {
             console.error('加入群组失败:', error);
             alert('操作失败: ' + (error.message || '请重试'));
@@ -111,10 +99,7 @@ const GroupList = () => {
 
     // 退出群组
     const handleLeaveGroup = async (groupId) => {
-        if (!window.confirm('确定要退出该群组吗？')) {
-            return;
-        }
-
+        if (!window.confirm('确定要退出该群组吗？')) return;
         try {
             await groupApi.leaveGroup(groupId);
             setGroups(prev => prev.filter(g => g.id !== groupId));
@@ -127,10 +112,7 @@ const GroupList = () => {
 
     // 解散群组
     const handleDismissGroup = async (groupId) => {
-        if (!window.confirm('确定要解散该群组吗？此操作不可撤销！')) {
-            return;
-        }
-
+        if (!window.confirm('确定要解散该群组吗？此操作不可撤销！')) return;
         try {
             await groupApi.dismissGroup(groupId);
             setGroups(prev => prev.filter(g => g.id !== groupId));
@@ -141,7 +123,31 @@ const GroupList = () => {
         }
     };
 
-    // 获取加群方式文本
+    // 进入群聊（关键修改：先创建/获取会话，再跳转）
+    const handleStartGroupChat = async (groupId) => {
+        try {
+            const response = await messageApi.createConversation(groupId, 1, '');
+            if (response && response.conversation_id) {
+                navigate(`/chat/group/${groupId}`, {
+                    state: {
+                        conversationId: response.conversation_id,
+                        conversation: {
+                            id: response.conversation_id,
+                            type: 1,
+                            target_id: groupId
+                        }
+                    }
+                });
+            } else {
+                throw new Error('创建会话失败');
+            }
+        } catch (error) {
+            console.error('进入群聊失败:', error);
+            alert('进入群聊失败，请重试');
+        }
+    };
+
+    // 辅助函数
     const getAddModeText = (mode) => {
         switch (mode) {
             case 0: return '直接加入';
@@ -151,7 +157,6 @@ const GroupList = () => {
         }
     };
 
-    // 获取群状态文本
     const getStatusText = (status) => {
         switch (status) {
             case 1: return '正常';
@@ -161,22 +166,13 @@ const GroupList = () => {
         }
     };
 
-    // 格式化时间
-    const formatTime = (timestamp) => {
-        if (!timestamp) return '';
-        const date = new Date(timestamp);
-        return date.toLocaleDateString();
-    };
+    const formatTime = (timestamp) => timestamp ? new Date(timestamp).toLocaleDateString() : '';
 
     // 过滤群组
     const filteredGroups = groups.filter(group => {
         if (!searchQuery) return true;
-
         const query = searchQuery.toLowerCase();
-        const name = group.name ? group.name.toLowerCase() : '';
-        const notice = group.notice ? group.notice.toLowerCase() : '';
-
-        return name.includes(query) || notice.includes(query);
+        return (group.name?.toLowerCase().includes(query) || group.notice?.toLowerCase().includes(query));
     });
 
     useEffect(() => {
@@ -197,12 +193,7 @@ const GroupList = () => {
             <div className="group-list-header">
                 <h2>群组</h2>
                 <div className="group-list-actions">
-                    <button
-                        className="create-group-btn"
-                        onClick={() => setCreatingGroup(true)}
-                    >
-                        创建群组
-                    </button>
+                    <button className="create-group-btn" onClick={() => setCreatingGroup(true)}>创建群组</button>
                 </div>
             </div>
 
@@ -240,10 +231,7 @@ const GroupList = () => {
                             <input
                                 type="text"
                                 value={newGroupData.name}
-                                onChange={(e) => setNewGroupData(prev => ({
-                                    ...prev,
-                                    name: e.target.value
-                                }))}
+                                onChange={(e) => setNewGroupData({ ...newGroupData, name: e.target.value })}
                                 placeholder="请输入群组名称"
                             />
                         </div>
@@ -251,10 +239,7 @@ const GroupList = () => {
                             <label>群公告</label>
                             <textarea
                                 value={newGroupData.notice}
-                                onChange={(e) => setNewGroupData(prev => ({
-                                    ...prev,
-                                    notice: e.target.value
-                                }))}
+                                onChange={(e) => setNewGroupData({ ...newGroupData, notice: e.target.value })}
                                 placeholder="请输入群公告"
                                 rows="3"
                             />
@@ -263,10 +248,7 @@ const GroupList = () => {
                             <label>加群方式</label>
                             <select
                                 value={newGroupData.add_mode}
-                                onChange={(e) => setNewGroupData(prev => ({
-                                    ...prev,
-                                    add_mode: parseInt(e.target.value)
-                                }))}
+                                onChange={(e) => setNewGroupData({ ...newGroupData, add_mode: parseInt(e.target.value) })}
                             >
                                 <option value="0">直接加入</option>
                                 <option value="1">需要审核</option>
@@ -278,26 +260,13 @@ const GroupList = () => {
                             <input
                                 type="text"
                                 value={newGroupData.avatar}
-                                onChange={(e) => setNewGroupData(prev => ({
-                                    ...prev,
-                                    avatar: e.target.value
-                                }))}
+                                onChange={(e) => setNewGroupData({ ...newGroupData, avatar: e.target.value })}
                                 placeholder="请输入头像URL"
                             />
                         </div>
                         <div className="modal-actions">
-                            <button
-                                className="cancel-btn"
-                                onClick={() => setCreatingGroup(false)}
-                            >
-                                取消
-                            </button>
-                            <button
-                                className="create-btn"
-                                onClick={handleCreateGroup}
-                            >
-                                创建
-                            </button>
+                            <button className="cancel-btn" onClick={() => setCreatingGroup(false)}>取消</button>
+                            <button className="create-btn" onClick={handleCreateGroup}>创建</button>
                         </div>
                     </div>
                 </div>
@@ -308,11 +277,7 @@ const GroupList = () => {
                     <div className="empty-group-list">
                         <div className="empty-icon">👥</div>
                         <h3>暂无群组</h3>
-                        <p>
-                            {activeTab === 'joined'
-                                ? '你还没有加入任何群组'
-                                : '你还没有创建任何群组'}
-                        </p>
+                        <p>{activeTab === 'joined' ? '你还没有加入任何群组' : '你还没有创建任何群组'}</p>
                         {activeTab === 'joined' ? (
                             <button
                                 className="join-group-btn"
@@ -320,25 +285,15 @@ const GroupList = () => {
                                     const groupId = prompt('请输入群组ID：');
                                     if (groupId) {
                                         groupApi.checkGroupAddMode(groupId)
-                                            .then(response => {
-                                                const addMode = response.add_mode;
-                                                handleJoinGroup(groupId, addMode);
-                                            })
-                                            .catch(error => {
-                                                alert('群组不存在或无法加入');
-                                            });
+                                            .then(response => handleJoinGroup(groupId, response.add_mode))
+                                            .catch(() => alert('群组不存在或无法加入'));
                                     }
                                 }}
                             >
                                 加入群组
                             </button>
                         ) : (
-                            <button
-                                className="create-group-prompt-btn"
-                                onClick={() => setCreatingGroup(true)}
-                            >
-                                创建群组
-                            </button>
+                            <button className="create-group-prompt-btn" onClick={() => setCreatingGroup(true)}>创建群组</button>
                         )}
                     </div>
                 ) : (
@@ -354,27 +309,17 @@ const GroupList = () => {
                                     <div className="group-info">
                                         <h4>{group.name}</h4>
                                         <div className="group-meta">
-                      <span className="member-count">
-                        👥 {group.member_cnt || 0}人
-                      </span>
-                                            <span className="add-mode">
-                        {getAddModeText(group.add_mode)}
-                      </span>
-                                            {group.status !== 1 && (
-                                                <span className="group-status">
-                          {getStatusText(group.status)}
-                        </span>
-                                            )}
+                                            <span className="member-count">👥 {group.member_cnt || 0}人</span>
+                                            <span className="add-mode">{getAddModeText(group.add_mode)}</span>
+                                            {group.status !== 1 && <span className="group-status">{getStatusText(group.status)}</span>}
                                         </div>
                                     </div>
                                 </div>
-
                                 {group.notice && (
                                     <div className="group-notice">
                                         <p>{group.notice}</p>
                                     </div>
                                 )}
-
                                 <div className="group-stats">
                                     <div className="stat-item">
                                         <span>创建时间:</span>
@@ -387,11 +332,10 @@ const GroupList = () => {
                                         </div>
                                     )}
                                 </div>
-
                                 <div className="group-actions">
                                     <button
                                         className="action-btn chat-btn"
-                                        onClick={() => navigate(`/chat/group/${group.id}`)}
+                                        onClick={() => handleStartGroupChat(group.id)}
                                         title="进入群聊"
                                     >
                                         💬 聊天
@@ -403,7 +347,6 @@ const GroupList = () => {
                                     >
                                         👁️ 详情
                                     </button>
-
                                     {activeTab === 'joined' ? (
                                         <button
                                             className="action-btn leave-btn"

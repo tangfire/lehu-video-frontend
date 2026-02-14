@@ -23,7 +23,6 @@ export const messageApi = {
     // 获取会话详情
     getConversationDetail: (conversationId) => {
         performanceMonitor.startRequest(`/conversation/${conversationId}`, 'GET');
-
         return request.get(`/conversation/${String(conversationId)}`)
             .finally(() => performanceMonitor.endRequest(`/conversation/${conversationId}`, 'GET'));
     },
@@ -31,7 +30,6 @@ export const messageApi = {
     // 获取消息列表
     listMessages: (conversationId, lastMsgId = "0", limit = 20) => {
         performanceMonitor.startRequest('/messages/list', 'POST');
-
         return request.post('/messages/list', {
             conversation_id: String(conversationId),
             last_msg_id: String(lastMsgId),
@@ -42,7 +40,6 @@ export const messageApi = {
     // 撤回消息
     recallMessage: (messageId) => {
         performanceMonitor.startRequest(`/message/${messageId}`, 'DELETE');
-
         return request.delete(`/message/${String(messageId)}`)
             .finally(() => performanceMonitor.endRequest(`/message/${messageId}`, 'DELETE'));
     },
@@ -50,7 +47,6 @@ export const messageApi = {
     // 标记消息已读
     markMessagesRead: (conversationId, lastMsgId) => {
         performanceMonitor.startRequest('/messages/read', 'POST');
-
         return request.post('/messages/read', {
             conversation_id: String(conversationId),
             last_msg_id: String(lastMsgId)
@@ -60,7 +56,6 @@ export const messageApi = {
     // 获取会话列表
     listConversations: (pageStats = { page: 1, page_size: 20 }) => {
         performanceMonitor.startRequest('/conversations', 'POST');
-
         return request.post('/conversations', {
             page_stats: pageStats
         }).finally(() => performanceMonitor.endRequest('/conversations', 'POST'));
@@ -69,7 +64,6 @@ export const messageApi = {
     // 删除会话
     deleteConversation: (conversationId) => {
         performanceMonitor.startRequest(`/conversation/${conversationId}`, 'DELETE');
-
         return request.delete(`/conversation/${String(conversationId)}`)
             .finally(() => performanceMonitor.endRequest(`/conversation/${conversationId}`, 'DELETE'));
     },
@@ -77,42 +71,40 @@ export const messageApi = {
     // 清空聊天记录
     clearMessages: (conversationId) => {
         performanceMonitor.startRequest('/messages', 'DELETE');
-
         return request.delete('/messages', {
-            params: {
-                conversation_id: String(conversationId)
-            }
+            params: { conversation_id: String(conversationId) }
         }).finally(() => performanceMonitor.endRequest('/messages', 'DELETE'));
     },
 
     // 获取未读消息数
     getUnreadCount: (conversationId = '', convType) => {
         performanceMonitor.startRequest('/messages/unread-count', 'GET');
-
         const params = {};
         if (conversationId) params.conversation_id = String(conversationId);
         if (convType !== undefined) params.conv_type = convType;
-
-        return request.get('/messages/unread-count', {
-            params: params
-        }).finally(() => performanceMonitor.endRequest('/messages/unread-count', 'GET'));
+        return request.get('/messages/unread-count', { params })
+            .finally(() => performanceMonitor.endRequest('/messages/unread-count', 'GET'));
     },
 
-    // 创建会话
+    // 创建会话（修正：单聊用 receiver_id，群聊用 group_id）
     createConversation: (targetId, convType, initialMessage = '') => {
         performanceMonitor.startRequest('/conversation', 'POST');
-
-        return request.post('/conversation', {
-            target_id: String(targetId),
+        const payload = {
             conv_type: convType,
             initial_message: initialMessage
-        }).finally(() => performanceMonitor.endRequest('/conversation', 'POST'));
+        };
+        if (convType === 0) {
+            payload.receiver_id = String(targetId);
+        } else {
+            payload.group_id = String(targetId);
+        }
+        return request.post('/conversation', payload)
+            .finally(() => performanceMonitor.endRequest('/conversation', 'POST'));
     },
 
     // 更新消息状态
     updateMessageStatus: (messageId, status) => {
         performanceMonitor.startRequest('/message/status', 'POST');
-
         return request.post('/message/status', {
             message_id: String(messageId),
             status
