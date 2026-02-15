@@ -314,6 +314,11 @@ class WebSocketManager {
 
     disconnect() {
         if (this.ws) {
+            // 移除所有事件监听器，避免触发 onclose 重连
+            this.ws.onopen = null;
+            this.ws.onclose = null;
+            this.ws.onerror = null;
+            this.ws.onmessage = null;
             this.ws.close();
             this.ws = null;
         }

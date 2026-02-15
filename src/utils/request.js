@@ -30,6 +30,7 @@ const generateRequestKey = (config) => {
         '/collection/list',
         '/friends',
         '/group/joined',
+        '/users/online-status',  // 添加这一行
         // 如果有其他读接口，继续添加
     ];
     const isReadUrl = readUrlPatterns.some(pattern => url.includes(pattern));

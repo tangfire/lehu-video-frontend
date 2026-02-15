@@ -57,21 +57,16 @@ const FriendList = () => {
                 }));
 
                 // 批量获取在线状态
+                // FriendList.jsx 第62行附近
                 const userIds = friendsList.map(f => f.friend?.id || f.id).filter(id => id);
                 if (userIds.length > 0) {
-                    const onlineResponse = await friendApi.batchGetUserOnlineStatus({
-                        user_ids: userIds
-                    });
+                    const onlineResponse = await friendApi.batchGetUserOnlineStatus(userIds); // 直接传数组
                     if (onlineResponse && onlineResponse.online_status) {
                         setOnlineStatus(onlineResponse.online_status);
-
                         // 计算在线好友数
                         const onlineCount = Object.values(onlineResponse.online_status)
                             .filter(status => status === 1).length;
-                        setStats(prev => ({
-                            ...prev,
-                            online: onlineCount
-                        }));
+                        setStats(prev => ({ ...prev, online: onlineCount }));
                     }
                 }
             }
