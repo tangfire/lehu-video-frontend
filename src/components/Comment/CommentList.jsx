@@ -7,10 +7,7 @@ import { debounce } from '../../utils/favoriteHelper';
 import CommentItem from './CommentItem';
 import './CommentList.css';
 
-const CommentList = forwardRef(({
-                                    videoId,
-                                    initialComments = []
-                                }, ref) => {
+const CommentList = forwardRef(({ videoId, initialComments = [] }, ref) => {
     const [comments, setComments] = useState([]);
     const [loading, setLoading] = useState(false);
     const [page, setPage] = useState(1);
@@ -29,12 +26,64 @@ const CommentList = forwardRef(({
         }
     }, [videoId]);
 
+    // 递归收集所有评论ID
+    const collectCommentIds = (commentsList) => {
+        let ids = [];
+        commentsList.forEach(comment => {
+            ids.push(comment.id);
+            if (comment.comments && comment.comments.length > 0) {
+                ids = ids.concat(collectCommentIds(comment.comments));
+            }
+        });
+        return ids;
+    };
+
+    // 批量加载点赞状态并更新评论树
+    const enrichCommentsWithLikeStatus = async (commentsList) => {
+        if (!currentUser || commentsList.length === 0) return commentsList;
+
+        const commentIds = collectCommentIds(commentsList);
+        if (commentIds.length === 0) return commentsList;
+
+        try {
+            const statusMap = await favoriteApi.batchCheckFavoriteStatus({
+                target: 1, // 评论
+                ids: commentIds
+            });
+
+            const updateComments = (list) => {
+                return list.map(comment => {
+                    const status = statusMap[comment.id] || {
+                        isLiked: false,
+                        isDisliked: false,
+                        likeCount: comment.likeCount || 0,
+                        dislikeCount: 0
+                    };
+                    const updated = {
+                        ...comment,
+                        isLiked: status.isLiked,
+                        isDisliked: status.isDisliked,
+                        likeCount: status.likeCount,
+                        dislikeCount: status.dislikeCount
+                    };
+                    if (updated.comments && updated.comments.length > 0) {
+                        updated.comments = updateComments(updated.comments);
+                    }
+                    return updated;
+                });
+            };
+
+            return updateComments(commentsList);
+        } catch (err) {
+            console.error('批量获取点赞状态失败:', err);
+            return commentsList;
+        }
+    };
+
     const loadComments = async (pageNum = 1) => {
         try {
             setLoading(true);
             setError(null);
-
-            console.log('加载评论，视频ID:', videoId, '页码:', pageNum);
 
             const response = await commentApi.getVideoComments({
                 videoId,
@@ -42,20 +91,16 @@ const CommentList = forwardRef(({
                 pageSize: 20
             });
 
-            console.log('评论API响应:', response);
-
             if (response && response.comments) {
                 let commentList = [];
                 let total = 0;
 
-                // 根据后端返回格式处理
                 if (response.comments && Array.isArray(response.comments)) {
                     commentList = response.comments;
                 } else if (response.data && response.data.comments && Array.isArray(response.data.comments)) {
                     commentList = response.data.comments;
                 }
 
-                // 处理分页信息
                 if (response.page_stats) {
                     total = response.page_stats.total || commentList.length;
                 } else if (response.data && response.data.page_stats) {
@@ -66,37 +111,29 @@ const CommentList = forwardRef(({
                     total = commentList.length;
                 }
 
-                // 检查后端是否返回嵌套结构
                 const hasNestedComments = commentList.some(comment =>
                     comment.comments && Array.isArray(comment.comments) && comment.comments.length > 0
                 );
 
                 let formattedComments;
-
                 if (hasNestedComments) {
-                    // 后端已经返回了嵌套结构，直接格式化
-                    console.log('后端返回了嵌套评论结构');
                     formattedComments = commentList.map(comment => formatCommentData(comment));
                 } else {
-                    // 后端返回平铺结构，需要构建树形结构
-                    console.log('后端返回平铺结构，需要构建树形结构');
                     formattedComments = buildCommentTree(commentList);
                 }
 
-                console.log('格式化后的评论:', formattedComments);
+                const enrichedComments = await enrichCommentsWithLikeStatus(formattedComments);
 
                 if (pageNum === 1) {
-                    setComments(formattedComments);
+                    setComments(enrichedComments);
                 } else {
-                    setComments(prev => [...prev, ...formattedComments]);
+                    setComments(prev => [...prev, ...enrichedComments]);
                 }
 
-                // 更新分页信息
                 const loadedCount = pageNum * 20;
                 setTotalCount(total);
                 setHasMore(formattedComments.length >= 20 || loadedCount < total);
             } else {
-                console.warn('没有获取到评论数据');
                 setComments([]);
                 setHasMore(false);
                 setTotalCount(0);
@@ -112,12 +149,17 @@ const CommentList = forwardRef(({
     };
 
     useImperativeHandle(ref, () => ({
-        reload: () => {
-            loadComments();
-        },
+        reload: () => { loadComments(); },
         addComment: (newComment) => {
             const formattedComment = formatCommentData(newComment);
-            setComments(prev => [formattedComment, ...prev]);
+            const enrichedComment = {
+                ...formattedComment,
+                isLiked: false,
+                isDisliked: false,
+                likeCount: formattedComment.likeCount || 0,
+                dislikeCount: 0
+            };
+            setComments(prev => [enrichedComment, ...prev]);
             setTotalCount(prev => prev + 1);
         }
     }));
@@ -147,34 +189,37 @@ const CommentList = forwardRef(({
 
             if (response && response.comment) {
                 const newReply = formatCommentData(response.comment);
+                const enrichedReply = {
+                    ...newReply,
+                    isLiked: false,
+                    isDisliked: false,
+                    likeCount: newReply.likeCount || 0,
+                    dislikeCount: 0
+                };
 
-                // 递归查找并添加回复到对应的评论
-                const addReplyToComment = (commentsList, targetId, reply) => {
+                const addReplyToComment = (commentsList) => {
                     return commentsList.map(comment => {
-                        if (comment.id === String(targetId)) {
+                        if (comment.id === String(commentId)) {
                             return {
                                 ...comment,
-                                comments: [...(comment.comments || []), newReply],
+                                comments: [...(comment.comments || []), enrichedReply],
                                 replyCount: (comment.replyCount || 0) + 1
                             };
                         }
-
                         if (comment.comments && comment.comments.length > 0) {
                             return {
                                 ...comment,
-                                comments: addReplyToComment(comment.comments, targetId, reply)
+                                comments: addReplyToComment(comment.comments)
                             };
                         }
-
                         return comment;
                     });
                 };
 
-                setComments(prev => addReplyToComment(prev, commentId, newReply));
+                setComments(prev => addReplyToComment(prev));
                 setShowReplyInput(null);
                 setReplyContent('');
                 setReplyToComment(null);
-
                 return true;
             }
         } catch (error) {
@@ -184,129 +229,84 @@ const CommentList = forwardRef(({
         }
     };
 
-    // 使用防抖处理点赞
-    const debouncedLike = useCallback(
-        debounce(async (commentId, isLiked) => {
+    // 通用点赞/点踩处理器（优化版）
+    const handleFavoriteAction = useCallback(
+        debounce(async (commentId, actionType, isCurrentlyActive) => {
             if (!currentUser) {
-                alert('请先登录后才能点赞评论');
+                alert('请先登录后才能操作');
                 return;
             }
 
             try {
                 let response;
-                if (isLiked) {
-                    response = await favoriteApi.unlikeComment(commentId);
+                if (actionType === 'like') {
+                    response = isCurrentlyActive
+                        ? await favoriteApi.unlikeComment(commentId)
+                        : await favoriteApi.likeComment(commentId);
                 } else {
-                    response = await favoriteApi.likeComment(commentId);
+                    response = isCurrentlyActive
+                        ? await favoriteApi.undislikeComment(commentId)
+                        : await favoriteApi.dislikeComment(commentId);
                 }
 
-                if (response) {
-                    // 递归更新评论点赞状态
-                    const updateCommentLikeState = (commentsList) => {
-                        return commentsList.map(comment => {
-                            if (comment.id === commentId) {
-                                return {
-                                    ...comment,
-                                    isLiked: !isLiked,
-                                    isDisliked: false,
-                                    likeCount: isLiked
-                                        ? Math.max(0, (comment.likeCount || 0) - 1)
-                                        : (comment.likeCount || 0) + 1
-                                };
+                // 更新评论树中对应评论的状态
+                const updateCommentState = (commentsList) => {
+                    return commentsList.map(comment => {
+                        if (comment.id === commentId) {
+                            const updated = { ...comment };
+                            // 更新点赞/点踩状态（根据操作推断）
+                            if (actionType === 'like') {
+                                updated.isLiked = !isCurrentlyActive;
+                                updated.isDisliked = false;
+                            } else {
+                                updated.isDisliked = !isCurrentlyActive;
+                                updated.isLiked = false;
                             }
-
-                            if (comment.comments && comment.comments.length > 0) {
-                                return {
-                                    ...comment,
-                                    comments: updateCommentLikeState(comment.comments)
-                                };
+                            // 使用后端返回的计数覆盖
+                            if (response.total_likes !== undefined) {
+                                updated.likeCount = response.total_likes;
                             }
+                            if (response.total_dislikes !== undefined) {
+                                updated.dislikeCount = response.total_dislikes;
+                            }
+                            return updated;
+                        }
+                        if (comment.comments && comment.comments.length > 0) {
+                            return {
+                                ...comment,
+                                comments: updateCommentState(comment.comments)
+                            };
+                        }
+                        return comment;
+                    });
+                };
 
-                            return comment;
-                        });
-                    };
-
-                    setComments(prev => updateCommentLikeState(prev));
-                }
+                setComments(prev => updateCommentState(prev));
             } catch (error) {
-                console.error('评论点赞操作失败:', error);
+                console.error('操作失败:', error);
                 alert('操作失败，请稍后重试');
             }
         }, 300),
         [currentUser]
     );
 
-    // 使用防抖处理点踩
-    const debouncedDislike = useCallback(
-        debounce(async (commentId, isDisliked) => {
-            if (!currentUser) {
-                alert('请先登录后才能点踩评论');
-                return;
-            }
-
-            try {
-                let response;
-                if (isDisliked) {
-                    response = await favoriteApi.undislikeComment(commentId);
-                } else {
-                    response = await favoriteApi.dislikeComment(commentId);
-                }
-
-                if (response) {
-                    // 递归更新评论点踩状态
-                    const updateCommentDislikeState = (commentsList) => {
-                        return commentsList.map(comment => {
-                            if (comment.id === commentId) {
-                                return {
-                                    ...comment,
-                                    isLiked: false,
-                                    isDisliked: !isDisliked,
-                                    dislikeCount: isDisliked
-                                        ? Math.max(0, (comment.dislikeCount || 0) - 1)
-                                        : (comment.dislikeCount || 0) + 1
-                                };
-                            }
-
-                            if (comment.comments && comment.comments.length > 0) {
-                                return {
-                                    ...comment,
-                                    comments: updateCommentDislikeState(comment.comments)
-                                };
-                            }
-
-                            return comment;
-                        });
-                    };
-
-                    setComments(prev => updateCommentDislikeState(prev));
-                }
-            } catch (error) {
-                console.error('评论点踩操作失败:', error);
-                alert('操作失败，请稍后重试');
-            }
-        }, 300),
-        [currentUser]
-    );
+    const handleLike = (commentId, isLiked) => handleFavoriteAction(commentId, 'like', isLiked);
+    const handleDislike = (commentId, isDisliked) => handleFavoriteAction(commentId, 'dislike', isDisliked);
 
     const handleDelete = async (commentId) => {
         if (!window.confirm('确定要删除这条评论吗？')) return;
 
         try {
             await commentApi.deleteComment(commentId);
-
-            // 递归删除评论
             const removeComment = (commentsList) => {
                 return commentsList.filter(comment => {
                     if (comment.id === commentId) return false;
-
                     if (comment.comments && comment.comments.length > 0) {
                         comment.comments = removeComment(comment.comments);
                     }
-
                     return true;
                 });
             };
-
             setComments(prev => removeComment(prev));
             setTotalCount(prev => prev - 1);
         } catch (error) {
@@ -319,9 +319,7 @@ const CommentList = forwardRef(({
         return (
             <div className="comment-error">
                 <p>{error}</p>
-                <button onClick={() => loadComments()} className="retry-btn">
-                    重试
-                </button>
+                <button onClick={() => loadComments()} className="retry-btn">重试</button>
             </div>
         );
     }
@@ -345,8 +343,8 @@ const CommentList = forwardRef(({
                                 key={comment.id}
                                 comment={comment}
                                 currentUserId={currentUser?.id}
-                                onLike={debouncedLike}
-                                onDislike={debouncedDislike}
+                                onLike={handleLike}
+                                onDislike={handleDislike}
                                 onReply={handleReply}
                                 onDelete={handleDelete}
                                 onReplySubmit={handleReplySubmit}

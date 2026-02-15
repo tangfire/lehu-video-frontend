@@ -3,7 +3,6 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { videoApi } from '../../api/video';
 import { favoriteApi } from '../../api/favorite';
 import { getCurrentUser } from '../../api/user';
-import { formatVideoData } from '../../utils/dataFormat';
 import CommentList from '../../components/Comment/CommentList';
 import CommentInput from '../../components/Comment/CommentInput';
 import FollowButton from '../../components/Follow/FollowButton';
@@ -15,7 +14,6 @@ const DEFAULT_AVATAR = '/default-avatar.png';
 
 const LikeErrorToast = ({ error, onClose }) => {
     if (!error) return null;
-
     return (
         <div className="like-error-toast" onClick={onClose}>
             <div className="like-error-content">
@@ -48,22 +46,28 @@ const VideoDetail = () => {
     const commentListRef = useRef(null);
 
     useEffect(() => {
+        const user = getCurrentUser();
+        setCurrentUser(user);
+    }, []);
+
+    useEffect(() => {
         if (id) {
             fetchVideoDetail();
         }
-        const user = getCurrentUser();
-        setCurrentUser(user);
-        console.log('当前用户:', user);
     }, [id]);
+
+    // 当用户登录状态变化或视频ID变化时，重新获取点赞状态
+    useEffect(() => {
+        if (video && currentUser) {
+            fetchLikeStatus();
+        }
+    }, [currentUser, video?.id]);
 
     const fetchVideoDetail = async () => {
         try {
             setLoading(true);
             setError(null);
-
             const response = await videoApi.getVideoById(id);
-            console.log('视频详情响应:', response);
-
             if (response && response.video) {
                 const videoData = response.video;
                 const formattedVideo = {
@@ -75,7 +79,7 @@ const VideoDetail = () => {
                     avatar: videoData.author?.avatar || DEFAULT_AVATAR,
                     views: videoData.viewCount || Math.floor(Math.random() * 10000) + 1000,
                     likes: videoData.favoriteCount || 0,
-                    dislikes: 0, // 后端没有返回，默认为0
+                    dislikes: 0,
                     comments: videoData.commentCount || 0,
                     shares: 0,
                     videoUrl: videoData.play_url,
@@ -87,21 +91,14 @@ const VideoDetail = () => {
                     isFollowing: videoData.author?.isFollowing || false,
                     isCollected: videoData.isCollected || false,
                     collectedCount: videoData.collectedCount || 0,
-                    // 直接保留原始字段
                     play_url: videoData.play_url,
                     cover_url: videoData.cover_url
                 };
-
-                console.log('格式化后的视频数据:', formattedVideo);
                 setVideo(formattedVideo);
-
-                // 更新收藏状态
                 setIsCollected(formattedVideo.isCollected || false);
                 setCollectionCount(formattedVideo.collectedCount || 0);
-
-                // 设置点赞状态
                 setIsLiked(formattedVideo.isFavorite || false);
-                setIsDisliked(formattedVideo.isDisliked || false);
+                setIsDisliked(false);
                 setIsFollowing(formattedVideo.isFollowing || false);
             } else {
                 setError('视频不存在或已删除');
@@ -113,6 +110,28 @@ const VideoDetail = () => {
             loadMockVideo();
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchLikeStatus = async () => {
+        try {
+            const res = await favoriteApi.checkFavoriteStatus({
+                target: 0,
+                type: 0,
+                id: video.id
+            });
+            // res 包含 total_likes, total_dislikes, is_favorite, favorite_type
+            setVideo(prev => ({
+                ...prev,
+                likes: res.total_likes || prev.likes,
+                dislikes: res.total_dislikes || prev.dislikes,
+                isFavorite: res.is_favorite && res.favorite_type === 0,
+                isDisliked: res.is_favorite && res.favorite_type === 1
+            }));
+            setIsLiked(res.is_favorite && res.favorite_type === 0);
+            setIsDisliked(res.is_favorite && res.favorite_type === 1);
+        } catch (error) {
+            console.warn('获取点赞状态失败:', error);
         }
     };
 
@@ -138,7 +157,6 @@ const VideoDetail = () => {
             isFollowing: false,
             play_url: ''
         };
-
         setVideo(mockVideo);
         setIsLiked(false);
         setIsDisliked(false);
@@ -151,57 +169,34 @@ const VideoDetail = () => {
             setTimeout(() => setLikeError(null), 3000);
             return;
         }
-
         if (!video || isLiking) return;
-
-        const wasLiked = isLiked;
-        const wasDisliked = isDisliked;
-
-        setIsLiked(!wasLiked);
-        setIsDisliked(false);
-        if (video) {
-            setVideo(prev => ({
-                ...prev,
-                likes: wasLiked ? Math.max(0, prev.likes - 1) : prev.likes + 1,
-                dislikes: wasDisliked ? Math.max(0, prev.dislikes - 1) : prev.dislikes,
-                isFavorite: !wasLiked,
-                isDisliked: false
-            }));
-        }
 
         setIsLiking(true);
         setLikeError(null);
 
         try {
-            let response;
-            if (wasLiked) {
-                response = await favoriteApi.unlikeVideo(video.id);
-            } else {
-                response = await favoriteApi.likeVideo(video.id);
-                if (wasDisliked) {
-                    await favoriteApi.undislikeVideo(video.id);
-                }
+            const response = isLiked
+                ? await favoriteApi.unlikeVideo(video.id)
+                : await favoriteApi.likeVideo(video.id);
+
+            if (response) {
+                setVideo(prev => ({
+                    ...prev,
+                    likes: response.total_likes !== undefined ? response.total_likes : prev.likes,
+                    dislikes: response.total_dislikes !== undefined ? response.total_dislikes : prev.dislikes,
+                    isFavorite: !isLiked,
+                    isDisliked: false
+                }));
+                setIsLiked(!isLiked);
+                setIsDisliked(false);
             }
         } catch (error) {
             console.error('点赞操作失败:', error);
-            setIsLiked(wasLiked);
-            setIsDisliked(wasDisliked);
-            if (video) {
-                setVideo(prev => ({
-                    ...prev,
-                    likes: wasLiked ? prev.likes + 1 : Math.max(0, prev.likes - 1),
-                    dislikes: wasDisliked ? prev.dislikes + 1 : Math.max(0, prev.dislikes - 1),
-                    isFavorite: wasLiked,
-                    isDisliked: wasDisliked
-                }));
-            }
-
             setLikeError(error.message || '操作失败，请稍后重试');
-            setTimeout(() => setLikeError(null), 3000);
         } finally {
             setIsLiking(false);
         }
-    }, [video, currentUser, isLiked, isDisliked, isLiking]);
+    }, [video, currentUser, isLiked, isLiking]);
 
     const handleDislike = useCallback(async () => {
         if (!currentUser) {
@@ -209,88 +204,64 @@ const VideoDetail = () => {
             setTimeout(() => setLikeError(null), 3000);
             return;
         }
-
         if (!video || isDisliking) return;
-
-        const wasLiked = isLiked;
-        const wasDisliked = isDisliked;
-
-        setIsDisliked(!wasDisliked);
-        setIsLiked(false);
-        if (video) {
-            setVideo(prev => ({
-                ...prev,
-                dislikes: wasDisliked ? Math.max(0, prev.dislikes - 1) : prev.dislikes + 1,
-                likes: wasLiked ? Math.max(0, prev.likes - 1) : prev.likes,
-                isDisliked: !wasDisliked,
-                isFavorite: false
-            }));
-        }
 
         setIsDisliking(true);
         setLikeError(null);
 
         try {
-            let response;
-            if (wasDisliked) {
-                response = await favoriteApi.undislikeVideo(video.id);
-            } else {
-                response = await favoriteApi.dislikeVideo(video.id);
-                if (wasLiked) {
-                    await favoriteApi.unlikeVideo(video.id);
-                }
+            const response = isDisliked
+                ? await favoriteApi.undislikeVideo(video.id)
+                : await favoriteApi.dislikeVideo(video.id);
+
+            if (response) {
+                setVideo(prev => ({
+                    ...prev,
+                    likes: response.total_likes !== undefined ? response.total_likes : prev.likes,
+                    dislikes: response.total_dislikes !== undefined ? response.total_dislikes : prev.dislikes,
+                    isDisliked: !isDisliked,
+                    isFavorite: false
+                }));
+                setIsDisliked(!isDisliked);
+                setIsLiked(false);
             }
         } catch (error) {
             console.error('点踩操作失败:', error);
-            setIsLiked(wasLiked);
-            setIsDisliked(wasDisliked);
-            if (video) {
-                setVideo(prev => ({
-                    ...prev,
-                    dislikes: wasDisliked ? prev.dislikes + 1 : Math.max(0, prev.dislikes - 1),
-                    likes: wasLiked ? prev.likes + 1 : Math.max(0, prev.likes - 1),
-                    isDisliked: wasDisliked,
-                    isFavorite: wasLiked
-                }));
-            }
-
             setLikeError(error.message || '操作失败，请稍后重试');
-            setTimeout(() => setLikeError(null), 3000);
         } finally {
             setIsDisliking(false);
         }
-    }, [video, currentUser, isLiked, isDisliked, isDisliking]);
-
+    }, [video, currentUser, isDisliked, isDisliking]);
     const handleFollowChange = (isFollowing) => {
         setIsFollowing(isFollowing);
-        if (video) {
-            setVideo(prev => ({
-                ...prev,
-                isFollowing: isFollowing
-            }));
-        }
-    };
-
-    const handleImageError = (e) => {
-        e.target.onerror = null;
-        e.target.src = DEFAULT_AVATAR;
+        setVideo(prev => ({ ...prev, isFollowing }));
     };
 
     const handleCommentSubmit = (newComment) => {
-        console.log('新评论提交成功:', newComment);
-
         if (video) {
-            setVideo(prev => ({
-                ...prev,
-                comments: (prev.comments || 0) + 1
-            }));
+            setVideo(prev => ({ ...prev, comments: (prev.comments || 0) + 1 }));
         }
-
         setNewCommentAdded(prev => prev + 1);
+        if (commentListRef.current?.reload) commentListRef.current.reload();
+    };
 
-        if (commentListRef.current) {
-            commentListRef.current.reload && commentListRef.current.reload();
+    const handleCollect = () => {
+        if (!currentUser) {
+            setLikeError('请先登录后才能收藏');
+            setTimeout(() => setLikeError(null), 3000);
+            return;
         }
+        setShowCollectionSelector(true);
+    };
+
+    const handleCollectionSuccess = () => {
+        setIsCollected(true);
+        setCollectionCount(prev => prev + 1);
+        setVideo(prev => ({
+            ...prev,
+            isCollected: true,
+            collectedCount: (prev.collectedCount || 0) + 1
+        }));
     };
 
     if (loading) {
@@ -306,12 +277,8 @@ const VideoDetail = () => {
         return (
             <div className="not-found">
                 <h2>{error}</h2>
-                <button onClick={() => navigate('/')} className="back-home-btn">
-                    返回首页
-                </button>
-                <button onClick={fetchVideoDetail} className="retry-btn" style={{marginLeft: '10px'}}>
-                    重试
-                </button>
+                <button onClick={() => navigate('/')} className="back-home-btn">返回首页</button>
+                <button onClick={fetchVideoDetail} className="retry-btn" style={{ marginLeft: '10px' }}>重试</button>
             </div>
         );
     }
@@ -325,56 +292,20 @@ const VideoDetail = () => {
         );
     }
 
-    // 添加收藏处理函数
-    const handleCollect = async () => {
-        if (!currentUser) {
-            setLikeError('请先登录后才能收藏');
-            setTimeout(() => setLikeError(null), 3000);
-            return;
-        }
-
-        setShowCollectionSelector(true);
-    };
-
-    // 添加收藏成功回调
-    const handleCollectionSuccess = () => {
-        setIsCollected(true);
-        setCollectionCount(prev => prev + 1);
-        if (video) {
-            setVideo(prev => ({
-                ...prev,
-                isCollected: true,
-                collectedCount: (prev.collectedCount || 0) + 1
-            }));
-        }
-    };
-
     return (
         <div className="video-detail-container">
-            <LikeErrorToast
-                error={likeError}
-                onClose={() => setLikeError(null)}
-            />
-
+            <LikeErrorToast error={likeError} onClose={() => setLikeError(null)} />
             {showCollectionSelector && (
                 <div className="collection-modal-overlay">
                     <CollectionSelector
-                        videoId={video?.id}
+                        videoId={video.id}
                         onClose={() => setShowCollectionSelector(false)}
                         onSuccess={handleCollectionSuccess}
                     />
                 </div>
             )}
-
-            <button className="back-button" onClick={() => navigate(-1)}>
-                ← 返回
-            </button>
-
-            {error && (
-                <div className="video-error-banner">
-                    <p>{error}（显示模拟数据）</p>
-                </div>
-            )}
+            <button className="back-button" onClick={() => navigate(-1)}>← 返回</button>
+            {error && <div className="video-error-banner"><p>{error}（显示模拟数据）</p></div>}
 
             <div className="video-detail-content">
                 <div className="video-player-section">
@@ -385,15 +316,10 @@ const VideoDetail = () => {
                                 className="video-player-element"
                                 poster={video.thumbnail || video.cover_url}
                                 src={video.play_url || video.videoUrl}
-                            >
-                                您的浏览器不支持视频播放
-                            </video>
+                            >您的浏览器不支持视频播放</video>
                         ) : (
                             <div className="video-placeholder">
-                                <img
-                                    src={video.thumbnail || video.cover_url || 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4'}
-                                    alt={video.title}
-                                />
+                                <img src={video.thumbnail || video.cover_url} alt={video.title} />
                                 <div className="play-button">▶</div>
                             </div>
                         )}
@@ -401,45 +327,26 @@ const VideoDetail = () => {
 
                     <div className="video-info">
                         <h1 className="video-title">{video.title}</h1>
-
                         <div className="video-meta-info">
-                            <div className="views-count">
-                                <span>👁️ {video.views || 0} 观看</span>
-                            </div>
-                            <div className="upload-time">
-                                发布于 {video.uploadTime || '刚刚'}
-                            </div>
+                            <span className="views-count">👁️ {video.views || 0} 观看</span>
+                            <span className="upload-time">发布于 {video.uploadTime || '刚刚'}</span>
                         </div>
-
-                        {video.description && (
-                            <div className="video-description">
-                                <p>{video.description}</p>
-                            </div>
-                        )}
-
-                        {video.tags && video.tags.length > 0 && (
+                        {video.description && <div className="video-description"><p>{video.description}</p></div>}
+                        {video.tags?.length > 0 && (
                             <div className="video-tags">
-                                {video.tags.map(tag => (
-                                    <span key={tag} className="tag">#{tag}</span>
-                                ))}
+                                {video.tags.map(tag => <span key={tag} className="tag">#{tag}</span>)}
                             </div>
                         )}
                     </div>
 
                     <div className="author-section">
                         <Link to={`/user/${video.authorId || 1}`} className="author-info">
-                            <img
-                                src={video.avatar || DEFAULT_AVATAR}
-                                alt={video.author}
-                                className="author-avatar"
-                                onError={handleImageError}
-                            />
+                            <img src={video.avatar || DEFAULT_AVATAR} alt={video.author} className="author-avatar" />
                             <div className="author-details">
                                 <h3>{video.author || '用户'}</h3>
                                 <p>短视频创作者</p>
                             </div>
                         </Link>
-
                         <div className="author-actions">
                             {currentUser && currentUser.id !== video.authorId && (
                                 <FollowButton
