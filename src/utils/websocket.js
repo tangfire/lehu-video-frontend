@@ -322,7 +322,7 @@ class WebSocketManager {
             this.ws.close();
             this.ws = null;
         }
-        this.listeners.clear();
+
         this.stopHeartbeat();
         this.stopConnectionCheck();
         this.emit('connection_status', 'disconnected');
@@ -361,6 +361,7 @@ class WebSocketManager {
     }
 
     emit(event, data) {
+        console.log(`🔥 WebSocket emit: ${event}`, data);
         if (this.listeners.has(event)) {
             this.listeners.get(event).forEach(callback => {
                 try {

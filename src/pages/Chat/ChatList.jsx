@@ -20,7 +20,8 @@ const ChatList = () => {
     const navigate = useNavigate();
 
     const currentUser = getCurrentUser();
-    const { unreadCount, connectionStatus, reconnect } = useWebSocket();
+    // ✅ 从 useWebSocket 中取出 onMessage 和 offMessage
+    const { unreadCount, connectionStatus, reconnect, onMessage, offMessage } = useWebSocket();
     const { cacheConversation, cacheUser, getCachedConversation } = useChat();
 
     // 使用 ref 来存储请求状态和定时器
@@ -464,6 +465,74 @@ const ChatList = () => {
         setSearchQuery(query);
         debouncedSearch(query);
     };
+
+    // ========== 正确监听 WebSocket 新消息 ==========
+    useEffect(() => {
+        const handleNewMessage = (message) => {
+            console.log('📩 ChatList 收到消息:', message);
+
+            // 提取消息数据（兼容两种结构）
+            const data = message.data || message;
+            if (!data.conversation_id) return;
+
+            const conversationId = String(data.conversation_id);
+            const senderId = String(data.sender_id || '');
+            const currentUserId = String(currentUser?.id || '');
+
+            // 构造预览文本
+            let lastMessage = data.content?.text || '';
+            if (data.msg_type === 1) lastMessage = '[图片]';
+            else if (data.msg_type === 2) lastMessage = '[语音]';
+            else if (data.msg_type === 3) lastMessage = '[视频]';
+            else if (data.msg_type === 4) lastMessage = '[文件]';
+
+            const lastMsgTime = data.created_at ? new Date(data.created_at).getTime() : Date.now();
+
+            // 更新 conversations 状态
+            setConversations(prev => {
+                const index = prev.findIndex(c => String(c.id) === conversationId);
+                if (index === -1) return prev; // 新会话由 fetch 处理
+
+                const updated = { ...prev[index] };
+                updated.last_message = lastMessage;
+                updated.last_msg_time = lastMsgTime;
+                // 不是自己发送的消息才增加未读计数
+                if (senderId !== currentUserId) {
+                    updated.unread_count = (updated.unread_count || 0) + 1;
+                }
+
+                const newList = [...prev];
+                newList[index] = updated;
+                newList.sort((a, b) => (b.last_msg_time || 0) - (a.last_msg_time || 0));
+                return newList;
+            });
+
+            // 同步更新 filteredConversations
+            setFilteredConversations(prev => {
+                const index = prev.findIndex(c => String(c.id) === conversationId);
+                if (index === -1) return prev;
+
+                const updated = { ...prev[index] };
+                updated.last_message = lastMessage;
+                updated.last_msg_time = lastMsgTime;
+                if (senderId !== currentUserId) {
+                    updated.unread_count = (updated.unread_count || 0) + 1;
+                }
+
+                const newFiltered = [...prev];
+                newFiltered[index] = updated;
+                newFiltered.sort((a, b) => (b.last_msg_time || 0) - (a.last_msg_time || 0));
+                return newFiltered;
+            });
+        };
+
+        // 注册回调（不需要事件名）
+        onMessage(handleNewMessage);
+
+        return () => {
+            offMessage(handleNewMessage);
+        };
+    }, [onMessage, offMessage, currentUser]); // 注意依赖
 
     // 监听WebSocket连接状态
     useEffect(() => {
