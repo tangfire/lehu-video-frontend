@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { groupApi } from '../../api/group';
 import { messageApi } from '../../api/message';
+import FriendSelector from '../../components/User/FriendSelector';
 import './Groups.css';
 
 const GroupList = () => {
@@ -11,11 +12,14 @@ const GroupList = () => {
     const [activeTab, setActiveTab] = useState('joined'); // 'joined', 'created'
     const [searchQuery, setSearchQuery] = useState('');
     const [creatingGroup, setCreatingGroup] = useState(false);
+    const [showFriendSelector, setShowFriendSelector] = useState(false);
     const [newGroupData, setNewGroupData] = useState({
         name: '',
         notice: '',
         add_mode: 0,
-        avatar: ''
+        avatar: '',
+        createdGroupId: null,
+        conversationId: null
     });
     const navigate = useNavigate();
 
@@ -42,7 +46,7 @@ const GroupList = () => {
     // 搜索群组
     const handleSearch = (query) => setSearchQuery(query);
 
-    // 创建群组
+    // 创建群组 - 第一步：创建群
     const handleCreateGroup = async () => {
         if (!newGroupData.name.trim()) {
             alert('请输入群组名称');
@@ -51,29 +55,62 @@ const GroupList = () => {
         try {
             const response = await groupApi.createGroup(newGroupData);
             if (response?.group_id) {
-                alert('群组创建成功！');
-                setCreatingGroup(false);
-                setNewGroupData({ name: '', notice: '', add_mode: 0, avatar: '' });
-                // 刷新列表
-                await fetchGroups('created');
-                // 创建会话并跳转到群聊
-                const convResponse = await messageApi.createConversation(response.group_id, 1, '欢迎加入群聊！');
+                const groupId = response.group_id;
+                // 创建会话
+                const convResponse = await messageApi.createConversation(groupId, 1, '欢迎加入群聊！');
                 if (convResponse?.conversation_id) {
-                    navigate(`/chat/group/${response.group_id}`, {
-                        state: {
-                            conversationId: convResponse.conversation_id,
-                            conversation: {
-                                id: convResponse.conversation_id,
-                                type: 1,
-                                target_id: response.group_id
-                            }
-                        }
-                    });
+                    setNewGroupData(prev => ({
+                        ...prev,
+                        createdGroupId: groupId,
+                        conversationId: convResponse.conversation_id
+                    }));
+                    setShowFriendSelector(true); // 打开好友选择器
                 }
             }
         } catch (error) {
             console.error('创建群组失败:', error);
             alert('创建群组失败，请重试');
+        }
+    };
+
+    // 确认选择好友后发送邀请
+    const handleConfirmInvite = async (selectedFriends) => {
+        const groupId = newGroupData.createdGroupId;
+        const conversationId = newGroupData.conversationId;
+        if (!groupId) return;
+
+        try {
+            // 为每个选中的好友发送邀请消息
+            for (const friend of selectedFriends) {
+                const friendId = friend.friend?.id || friend.id;
+                await messageApi.sendMessage({
+                    conversation_id: conversationId,
+                    receiver_id: friendId,
+                    conv_type: 0, // 单聊
+                    msg_type: 0,
+                    content: { text: `[邀请]你已被邀请加入群组 ${groupId}，点击加入` },
+                    client_msg_id: `invite_${Date.now()}_${friendId}`
+                });
+            }
+            alert('邀请已发送！');
+            // 跳转到群聊
+            navigate(`/chat/group/${groupId}`, {
+                state: {
+                    conversationId: conversationId,
+                    conversation: {
+                        id: conversationId,
+                        type: 1,
+                        target_id: groupId
+                    }
+                }
+            });
+        } catch (error) {
+            console.error('发送邀请失败:', error);
+            alert('部分邀请发送失败');
+        } finally {
+            setShowFriendSelector(false);
+            setCreatingGroup(false);
+            setNewGroupData({ name: '', notice: '', add_mode: 0, avatar: '', createdGroupId: null, conversationId: null });
         }
     };
 
@@ -123,7 +160,7 @@ const GroupList = () => {
         }
     };
 
-    // 进入群聊（关键修改：先创建/获取会话，再跳转）
+    // 进入群聊
     const handleStartGroupChat = async (groupId) => {
         try {
             const response = await messageApi.createConversation(groupId, 1, '');
@@ -222,7 +259,8 @@ const GroupList = () => {
                 </button>
             </div>
 
-            {creatingGroup && (
+            {/* 创建群组模态框 */}
+            {creatingGroup && !showFriendSelector && (
                 <div className="create-group-modal">
                     <div className="modal-content">
                         <h3>创建新群组</h3>
@@ -269,6 +307,21 @@ const GroupList = () => {
                             <button className="create-btn" onClick={handleCreateGroup}>创建</button>
                         </div>
                     </div>
+                </div>
+            )}
+
+            {/* 好友选择器模态框 */}
+            {showFriendSelector && (
+                <div className="modal-overlay">
+                    <FriendSelector
+                        onConfirm={handleConfirmInvite}
+                        onCancel={() => {
+                            setShowFriendSelector(false);
+                            setCreatingGroup(false);
+                            setNewGroupData({ name: '', notice: '', add_mode: 0, avatar: '', createdGroupId: null, conversationId: null });
+                        }}
+                        multiple={true}
+                    />
                 </div>
             )}
 

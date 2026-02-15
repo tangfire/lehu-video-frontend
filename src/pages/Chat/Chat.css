@@ -1117,3 +1117,22 @@
     color: #666;
     margin-top: 10px;
 }
+
+/* 在 Chat.css 末尾添加 */
+.join-group-btn {
+    margin-top: 8px;
+    padding: 6px 12px;
+    background: linear-gradient(135deg, #4caf50 0%, #2e7d32 100%);
+    color: white;
+    border: none;
+    border-radius: 16px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.join-group-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+}

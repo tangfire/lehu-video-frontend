@@ -3,7 +3,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { groupApi } from '../../api/group';
 import { friendApi } from '../../api/friend';
+import { messageApi } from '../../api/message';
 import { getCurrentUser } from '../../api/user';
+import FriendSelector from '../../components/User/FriendSelector';
 import './Groups.css';
 
 const GroupDetail = () => {
@@ -17,6 +19,7 @@ const GroupDetail = () => {
     const [editMode, setEditMode] = useState(false);
     const [editedInfo, setEditedInfo] = useState({});
     const [newNotice, setNewNotice] = useState('');
+    const [showInviteSelector, setShowInviteSelector] = useState(false);
     const currentUser = getCurrentUser();
 
     // 获取群组详情
@@ -100,10 +103,36 @@ const GroupDetail = () => {
         }
     };
 
-    const handleInviteMember = () => {
-        const userId = prompt('请输入要邀请的用户ID：');
-        if (userId) {
-            alert(`邀请用户 ${userId}（API待实现）`);
+    // 邀请好友
+    const handleInviteFriends = async (selectedFriends) => {
+        // 获取会话ID
+        try {
+            const conversations = await messageApi.listConversations({ page: 1, page_size: 50 });
+            const conv = conversations?.conversations?.find(c => c.type === 1 && (c.group_id === groupId || c.target_id === groupId));
+            let conversationId = conv?.id;
+            if (!conversationId) {
+                const newConv = await messageApi.createConversation(groupId, 1, '');
+                conversationId = newConv?.conversation_id;
+            }
+            if (!conversationId) throw new Error('无法获取会话ID');
+
+            for (const friend of selectedFriends) {
+                const friendId = friend.friend?.id || friend.id;
+                await messageApi.sendMessage({
+                    conversation_id: conversationId,
+                    receiver_id: friendId,
+                    conv_type: 0,
+                    msg_type: 0,
+                    content: { text: `[邀请]你已被邀请加入群组 ${groupId}，点击加入` },
+                    client_msg_id: `invite_${Date.now()}_${friendId}`
+                });
+            }
+            alert('邀请已发送！');
+        } catch (error) {
+            console.error('发送邀请失败:', error);
+            alert('发送邀请失败，请重试');
+        } finally {
+            setShowInviteSelector(false);
         }
     };
 
@@ -239,7 +268,11 @@ const GroupDetail = () => {
                     <div className="group-members-section">
                         <div className="members-header">
                             <h3>群成员 ({members.length})</h3>
-                            {isOwner && <button className="invite-btn" onClick={handleInviteMember}>邀请成员</button>}
+                            {isOwner && (
+                                <>
+                                    <button className="invite-btn" onClick={() => setShowInviteSelector(true)}>邀请好友</button>
+                                </>
+                            )}
                         </div>
 
                         <div className="members-list">
@@ -300,6 +333,17 @@ const GroupDetail = () => {
                     </div>
                 )}
             </div>
+
+            {/* 邀请好友选择器 */}
+            {showInviteSelector && (
+                <div className="modal-overlay">
+                    <FriendSelector
+                        onConfirm={handleInviteFriends}
+                        onCancel={() => setShowInviteSelector(false)}
+                        multiple={true}
+                    />
+                </div>
+            )}
         </div>
     );
 };

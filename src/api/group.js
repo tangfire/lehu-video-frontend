@@ -18,9 +18,9 @@ export const groupApi = {
         return request.get(`/group/${groupId}/add-mode`);
     },
 
-    // 直接进群
+    // 直接进群（修复：传递空对象作为请求体）
     enterGroupDirectly: (groupId) => {
-        return request.post(`/group/${groupId}/enter`);
+        return request.post(`/group/${groupId}/enter`, {}); // 关键修改
     },
 
     // 申请加群
@@ -50,5 +50,10 @@ export const groupApi = {
         return request.post('/group/joined', {
             page_stats: pageStats
         });
+    },
+
+    // 新增：获取群成员列表
+    getGroupMembers: (groupId) => {
+        return request.get(`/group/${groupId}/members`);
     }
 };

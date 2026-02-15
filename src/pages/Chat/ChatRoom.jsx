@@ -952,7 +952,43 @@ const ChatRoom = () => {
                                         <>
                                             <div className="message-content">
                                                 {message.content?.text && (
-                                                    <p className="message-text">{message.content.text}</p>
+                                                    <>
+                                                        <p className="message-text">{message.content.text}</p>
+                                                        {message.content.text.startsWith('[邀请]') && (
+                                                            <button
+                                                                className="join-group-btn"
+                                                                onClick={async () => {
+                                                                    // 解析群ID
+                                                                    const match = message.content.text.match(/加入群组 (\d+)/);
+                                                                    if (match && match[1]) {
+                                                                        const groupId = match[1];
+                                                                        try {
+                                                                            // 检查加群方式
+                                                                            const modeRes = await groupApi.checkGroupAddMode(groupId);
+                                                                            if (modeRes?.add_mode === 0) {
+                                                                                await groupApi.enterGroupDirectly(groupId);
+                                                                                alert('已加入群聊');
+                                                                                // 刷新群列表或跳转
+                                                                                navigate(`/group/${groupId}`);
+                                                                            } else {
+                                                                                // 需要申请
+                                                                                const reason = prompt('请输入申请理由：');
+                                                                                if (reason !== null) {
+                                                                                    await groupApi.applyJoinGroup(groupId, reason);
+                                                                                    alert('申请已提交，等待审核');
+                                                                                }
+                                                                            }
+                                                                        } catch (error) {
+                                                                            console.error('加入群聊失败', error);
+                                                                            alert('加入失败，请稍后重试');
+                                                                        }
+                                                                    }
+                                                                }}
+                                                            >
+                                                                加入群聊
+                                                            </button>
+                                                        )}
+                                                    </>
                                                 )}
                                                 {message.content?.image_url && (
                                                     <img

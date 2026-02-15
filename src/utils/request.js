@@ -28,6 +28,8 @@ const generateRequestKey = (config) => {
         '/comment/video',
         '/comment/child',
         '/collection/list',
+        '/friends',
+        '/group/joined',
         // 如果有其他读接口，继续添加
     ];
     const isReadUrl = readUrlPatterns.some(pattern => url.includes(pattern));

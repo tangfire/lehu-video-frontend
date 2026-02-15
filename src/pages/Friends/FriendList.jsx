@@ -131,7 +131,8 @@ const FriendList = () => {
     };
 
     // 删除好友
-    const handleDeleteFriend = async (friendId) => {
+    const handleDeleteFriend = async (friendId, e) => {
+        e.stopPropagation(); // 阻止点击卡片
         if (!window.confirm('确定要删除这个好友吗？删除后将不能查看对方动态。')) {
             return;
         }
@@ -153,7 +154,8 @@ const FriendList = () => {
     };
 
     // 更新好友备注
-    const handleUpdateRemark = async (friendId, currentRemark) => {
+    const handleUpdateRemark = async (friendId, currentRemark, e) => {
+        e.stopPropagation();
         const newRemark = prompt('请输入新的备注：', currentRemark || '');
         if (newRemark === null) return;
 
@@ -174,7 +176,8 @@ const FriendList = () => {
     };
 
     // 设置好友分组
-    const handleSetGroup = async (friendId, currentGroup) => {
+    const handleSetGroup = async (friendId, currentGroup, e) => {
+        e.stopPropagation();
         const newGroup = prompt('请输入分组名称（留空则取消分组）：', currentGroup || '');
         if (newGroup === null) return;
 
@@ -203,7 +206,7 @@ const FriendList = () => {
         }
     };
 
-    // 发起聊天（关键修改：先创建/获取会话，再跳转）
+    // 发起聊天（点击卡片直接进入）
     const handleStartChat = async (friendId) => {
         try {
             const response = await messageApi.createConversation(friendId, 0, '');
@@ -411,8 +414,12 @@ const FriendList = () => {
                             const statusColor = getOnlineStatusColor(onlineStatus[friendId]);
 
                             return (
-                                <div key={friendId} className="friend-card">
-                                    <div className="friend-avatar">
+                                <div
+                                    key={friendId}
+                                    className="friend-card"
+                                    onClick={() => handleStartChat(friendId)}
+                                >
+                                    <div className="friend-avatar" onClick={(e) => e.stopPropagation()}>
                                         <img
                                             src={friendAvatar}
                                             alt={friendName}
@@ -441,7 +448,7 @@ const FriendList = () => {
                                             </div>
                                         )}
 
-                                        <div className="friend-actions">
+                                        <div className="friend-actions" onClick={(e) => e.stopPropagation()}>
                                             <button
                                                 className="action-btn chat-btn"
                                                 onClick={() => handleStartChat(friendId)}
@@ -451,21 +458,21 @@ const FriendList = () => {
                                             </button>
                                             <button
                                                 className="action-btn remark-btn"
-                                                onClick={() => handleUpdateRemark(friendId, friend.remark)}
+                                                onClick={(e) => handleUpdateRemark(friendId, friend.remark, e)}
                                                 title="修改备注"
                                             >
                                                 ✏️
                                             </button>
                                             <button
                                                 className="action-btn group-btn"
-                                                onClick={() => handleSetGroup(friendId, friend.group_name)}
+                                                onClick={(e) => handleSetGroup(friendId, friend.group_name, e)}
                                                 title="设置分组"
                                             >
                                                 📁
                                             </button>
                                             <button
                                                 className="action-btn delete-btn"
-                                                onClick={() => handleDeleteFriend(friendId)}
+                                                onClick={(e) => handleDeleteFriend(friendId, e)}
                                                 title="删除好友"
                                             >
                                                 🗑️
