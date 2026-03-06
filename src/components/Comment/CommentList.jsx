@@ -119,6 +119,7 @@ const CommentList = forwardRef(({ videoId, initialComments = [] }, ref) => {
                 if (hasNestedComments) {
                     formattedComments = commentList.map(comment => formatCommentData(comment));
                 } else {
+                    // 新版：评论列表只有主评论，buildCommentTree 会将它们作为根评论
                     formattedComments = buildCommentTree(commentList);
                 }
 
@@ -167,6 +168,111 @@ const CommentList = forwardRef(({ videoId, initialComments = [] }, ref) => {
     const loadMoreComments = () => {
         if (!loading && hasMore) {
             loadComments(page + 1);
+        }
+    };
+
+    // 加载子评论
+    const loadChildComments = async (parentId, pageNum = 1) => {
+        try {
+            // 设置该父评论的加载状态
+            setComments(prev =>
+                prev.map(c => {
+                    if (c.id === parentId) {
+                        return { ...c, _childLoading: true };
+                    }
+                    if (c.comments) {
+                        return {
+                            ...c,
+                            comments: c.comments.map(sub => {
+                                if (sub.id === parentId) return { ...sub, _childLoading: true };
+                                return sub;
+                            })
+                        };
+                    }
+                    return c;
+                })
+            );
+
+            const response = await commentApi.getChildComments({
+                commentId: parentId,
+                page: pageNum,
+                pageSize: 10 // 每页子评论数
+            });
+
+            let childList = [];
+            let total = 0;
+
+            if (response && response.comments) {
+                childList = response.comments;
+                total = response.page_stats?.total || childList.length;
+            } else if (response && response.data && response.data.comments) {
+                childList = response.data.comments;
+                total = response.data.page_stats?.total || childList.length;
+            }
+
+            // 格式化子评论
+            let formattedChildren = childList.map(child => formatCommentData(child));
+            // 增强点赞状态
+            formattedChildren = await enrichCommentsWithLikeStatus(formattedChildren);
+
+            // 更新对应父评论的 comments 字段
+            setComments(prev =>
+                prev.map(c => {
+                    if (c.id === parentId) {
+                        const existingChildren = c.comments || [];
+                        const newChildren = pageNum === 1 ? formattedChildren : [...existingChildren, ...formattedChildren];
+                        return {
+                            ...c,
+                            comments: newChildren,
+                            _childLoading: false,
+                            _childPage: pageNum,
+                            _childHasMore: newChildren.length < total
+                        };
+                    }
+                    // 递归处理子评论（虽然理论上子评论不再有子评论，但为了完整）
+                    if (c.comments) {
+                        return {
+                            ...c,
+                            comments: c.comments.map(sub => {
+                                if (sub.id === parentId) {
+                                    const existingChildren = sub.comments || [];
+                                    const newChildren = pageNum === 1 ? formattedChildren : [...existingChildren, ...formattedChildren];
+                                    return {
+                                        ...sub,
+                                        comments: newChildren,
+                                        _childLoading: false,
+                                        _childPage: pageNum,
+                                        _childHasMore: newChildren.length < total
+                                    };
+                                }
+                                return sub;
+                            })
+                        };
+                    }
+                    return c;
+                })
+            );
+        } catch (error) {
+            console.error('加载子评论失败:', error);
+            // 清除加载状态
+            setComments(prev =>
+                prev.map(c => {
+                    if (c.id === parentId) {
+                        return { ...c, _childLoading: false };
+                    }
+                    if (c.comments) {
+                        return {
+                            ...c,
+                            comments: c.comments.map(sub => {
+                                if (sub.id === parentId) return { ...sub, _childLoading: false };
+                                return sub;
+                            })
+                        };
+                    }
+                    return c;
+                })
+            );
+            alert('加载子评论失败，请稍后重试');
         }
     };
 
@@ -229,7 +335,7 @@ const CommentList = forwardRef(({ videoId, initialComments = [] }, ref) => {
         }
     };
 
-    // 通用点赞/点踩处理器（优化版）
+    // 通用点赞/点踩处理器
     const handleFavoriteAction = useCallback(
         debounce(async (commentId, actionType, isCurrentlyActive) => {
             if (!currentUser) {
@@ -249,12 +355,10 @@ const CommentList = forwardRef(({ videoId, initialComments = [] }, ref) => {
                         : await favoriteApi.dislikeComment(commentId);
                 }
 
-                // 更新评论树中对应评论的状态
                 const updateCommentState = (commentsList) => {
                     return commentsList.map(comment => {
                         if (comment.id === commentId) {
                             const updated = { ...comment };
-                            // 更新点赞/点踩状态（根据操作推断）
                             if (actionType === 'like') {
                                 updated.isLiked = !isCurrentlyActive;
                                 updated.isDisliked = false;
@@ -262,7 +366,6 @@ const CommentList = forwardRef(({ videoId, initialComments = [] }, ref) => {
                                 updated.isDisliked = !isCurrentlyActive;
                                 updated.isLiked = false;
                             }
-                            // 使用后端返回的计数覆盖
                             if (response.total_likes !== undefined) {
                                 updated.likeCount = response.total_likes;
                             }
@@ -348,6 +451,7 @@ const CommentList = forwardRef(({ videoId, initialComments = [] }, ref) => {
                                 onReply={handleReply}
                                 onDelete={handleDelete}
                                 onReplySubmit={handleReplySubmit}
+                                onLoadChildComments={loadChildComments}
                                 showReplyInput={showReplyInput}
                                 onToggleReply={setShowReplyInput}
                                 replyContent={replyContent}

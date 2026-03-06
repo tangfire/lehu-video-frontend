@@ -14,6 +14,7 @@ const CommentItem = ({
                          onReply,
                          onDelete,
                          onReplySubmit,
+                         onLoadChildComments,
                          showReplyInput,
                          onToggleReply,
                          replyContent,
@@ -37,14 +38,18 @@ const CommentItem = ({
     const replyUser = comment?.replyUser;
     const isCurrentUser = currentUserId === user.id;
 
+    // 是否应该显示“查看回复”按钮（主评论且有回复数，并且还没有加载过或加载不完全）
+    const shouldShowLoadReplies = depth === 0 && comment.replyCount > 0;
+    const hasLoadedReplies = comment.comments && comment.comments.length > 0;
+    const hasMoreReplies = comment.replyCount > (comment.comments?.length || 0);
+    const isLoadingReplies = comment._childLoading;
+
     const handleLike = async () => {
         if (!currentUserId) {
             alert('请先登录后才能点赞评论');
             return;
         }
-
         if (isLiking) return;
-
         setIsLiking(true);
         try {
             await onLike(comment.id, comment.isLiked);
@@ -60,9 +65,7 @@ const CommentItem = ({
             alert('请先登录后才能点踩评论');
             return;
         }
-
         if (isDisliking) return;
-
         setIsDisliking(true);
         try {
             await onDislike(comment.id, comment.isDisliked);
@@ -89,7 +92,6 @@ const CommentItem = ({
     const handleImageError = (e) => {
         e.target.onerror = null;
         e.target.src = DEFAULT_AVATAR;
-        console.warn('头像加载失败，使用默认头像');
     };
 
     const handleSubmitReply = async () => {
@@ -128,6 +130,13 @@ const CommentItem = ({
         if (setReplyContent) {
             setReplyContent(value);
         }
+    };
+
+    // 加载子评论
+    const handleLoadReplies = () => {
+        if (isLoadingReplies) return;
+        const nextPage = comment._childPage ? comment._childPage + 1 : 1;
+        onLoadChildComments(comment.id, nextPage);
     };
 
     const isReplyingThisComment = showReplyInput === comment.id;
@@ -266,6 +275,7 @@ const CommentItem = ({
                         </div>
                     )}
 
+                    {/* 已加载的子评论列表 */}
                     {comment.comments && comment.comments.length > 0 && (
                         <div className="child-comments">
                             {comment.comments.map(childComment => (
@@ -278,6 +288,7 @@ const CommentItem = ({
                                     onReply={onReply}
                                     onDelete={onDelete}
                                     onReplySubmit={onReplySubmit}
+                                    onLoadChildComments={onLoadChildComments}
                                     showReplyInput={showReplyInput}
                                     onToggleReply={onToggleReply}
                                     replyContent={replyContent}
@@ -286,6 +297,32 @@ const CommentItem = ({
                                     depth={depth + 1}
                                 />
                             ))}
+
+                            {/* 加载更多子评论按钮 */}
+                            {hasMoreReplies && (
+                                <div className="load-more-replies">
+                                    <button
+                                        className="load-more-replies-btn"
+                                        onClick={handleLoadReplies}
+                                        disabled={isLoadingReplies}
+                                    >
+                                        {isLoadingReplies ? '加载中...' : `加载更多回复 (${comment.comments.length}/${comment.replyCount})`}
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* 首次加载子评论按钮（当还没有任何子评论时） */}
+                    {shouldShowLoadReplies && !hasLoadedReplies && (
+                        <div className="load-replies">
+                            <button
+                                className="load-replies-btn"
+                                onClick={handleLoadReplies}
+                                disabled={isLoadingReplies}
+                            >
+                                {isLoadingReplies ? '加载中...' : `查看 ${comment.replyCount} 条回复`}
+                            </button>
                         </div>
                     )}
                 </div>

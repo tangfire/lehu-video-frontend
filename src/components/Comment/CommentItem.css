@@ -310,6 +310,36 @@
     border-top-color: #3498db;
 }
 
+
+/* 添加到 CommentItem.css */
+.load-replies,
+.load-more-replies {
+    margin-top: 8px;
+}
+
+.load-replies-btn,
+.load-more-replies-btn {
+    background: none;
+    border: none;
+    color: #667eea;
+    font-size: 13px;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+}
+
+.load-replies-btn:hover,
+.load-more-replies-btn:hover {
+    background-color: rgba(102, 126, 234, 0.1);
+}
+
+.load-replies-btn:disabled,
+.load-more-replies-btn:disabled {
+    color: #999;
+    cursor: not-allowed;
+}
+
 @keyframes spin {
     to {
         transform: rotate(360deg);
