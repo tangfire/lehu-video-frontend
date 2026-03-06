@@ -6,19 +6,19 @@ import MainLayout from './components/Layout/MainLayout';
 import Home from './pages/Home';
 import VideoDetail from './pages/VideoDetail';
 import UserCenter from './pages/UserCenter';
-import FollowPage from './pages/Follow';
+import FollowPage from './pages/Follow';          // 确保这是默认导出
 import Settings from './pages/Settings';
 import Upload from './pages/Upload';
 import Login from './pages/Login';
 import Register from './pages/Register';
-import ChatList from './pages/Chat/ChatList.jsx';
+import ChatList from './pages/Chat/ChatList';
 import ChatRoom from './pages/Chat/ChatRoom';
 import Friends from './pages/Friends/FriendList';
 import FriendRequests from './pages/Friends/FriendRequests';
 import Groups from './pages/Groups/GroupList';
-import GroupDetail from './pages/Groups/GroupDetail.jsx';
+import GroupDetail from './pages/Groups/GroupDetail';
 import Collections from './pages/Collection/Collections';
-import AuthRoute from './components/AuthRoute';
+import AuthRoute from './components/AuthRoute';    // 确保 AuthRoute 正确导出
 import './App.css';
 import SearchPage from "./pages/Search/index.jsx";
 
@@ -28,7 +28,6 @@ function App() {
             <ChatProvider>
                 <WebSocketProvider>
                     <Routes>
-                        {/* 需要布局的页面 */}
                         <Route path="/" element={<MainLayout />}>
                             <Route index element={<Home />} />
                             <Route path="video/:id" element={<VideoDetail />} />
@@ -87,18 +86,14 @@ function App() {
                                     <GroupDetail />
                                 </AuthRoute>
                             } />
-
                             <Route path="search" element={
                                 <AuthRoute>
                                     <SearchPage />
                                 </AuthRoute>
                             } />
                         </Route>
-
-                        {/* 独立页面（无布局） */}
                         <Route path="/login" element={<Login />} />
                         <Route path="/register" element={<Register />} />
-
                         <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>
                 </WebSocketProvider>
