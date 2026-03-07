@@ -23,6 +23,7 @@ const FriendList = () => {
     const navigate = useNavigate();
 
     // 获取好友列表
+    // 获取好友列表
     const fetchFriends = useCallback(async () => {
         try {
             setLoading(true);
@@ -57,15 +58,17 @@ const FriendList = () => {
                 }));
 
                 // 批量获取在线状态
-                // FriendList.jsx 第62行附近
                 const userIds = friendsList.map(f => f.friend?.id || f.id).filter(id => id);
                 if (userIds.length > 0) {
-                    const onlineResponse = await friendApi.batchGetUserOnlineStatus(userIds); // 直接传数组
-                    if (onlineResponse && onlineResponse.online_status) {
-                        setOnlineStatus(onlineResponse.online_status);
+                    const onlineResponse = await friendApi.batchGetUserOnlineStatus(userIds);
+                    console.log('在线状态响应:', onlineResponse);
+
+                    // 处理可能的不同字段名
+                    const statusData = onlineResponse?.statuses || onlineResponse?.online_status;
+                    if (statusData) {
+                        setOnlineStatus(statusData);
                         // 计算在线好友数
-                        const onlineCount = Object.values(onlineResponse.online_status)
-                            .filter(status => status === 1).length;
+                        const onlineCount = Object.values(statusData).filter(status => status === 1).length;
                         setStats(prev => ({ ...prev, online: onlineCount }));
                     }
                 }
