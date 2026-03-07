@@ -1,5 +1,5 @@
 // pages/Friends/FriendList.jsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { friendApi } from '../../api/friend';
 import { messageApi } from '../../api/message';
@@ -22,8 +22,10 @@ const FriendList = () => {
     });
     const navigate = useNavigate();
 
-    // 获取好友列表
-    // 获取好友列表
+    // 定时器引用
+    const timerRef = useRef(null);
+
+    // 获取好友列表（包含基本信息）
     const fetchFriends = useCallback(async () => {
         try {
             setLoading(true);
@@ -57,21 +59,8 @@ const FriendList = () => {
                     groups: groups.size - 1 // 减去"全部"
                 }));
 
-                // 批量获取在线状态
-                const userIds = friendsList.map(f => f.friend?.id || f.id).filter(id => id);
-                if (userIds.length > 0) {
-                    const onlineResponse = await friendApi.batchGetUserOnlineStatus(userIds);
-                    console.log('在线状态响应:', onlineResponse);
-
-                    // 处理可能的不同字段名
-                    const statusData = onlineResponse?.statuses || onlineResponse?.online_status;
-                    if (statusData) {
-                        setOnlineStatus(statusData);
-                        // 计算在线好友数
-                        const onlineCount = Object.values(statusData).filter(status => status === 1).length;
-                        setStats(prev => ({ ...prev, online: onlineCount }));
-                    }
-                }
+                // 首次获取在线状态
+                fetchOnlineStatus(friendsList);
             }
         } catch (error) {
             console.error('获取好友列表失败:', error);
@@ -79,6 +68,48 @@ const FriendList = () => {
             setLoading(false);
         }
     }, []);
+
+    // 单独获取在线状态（供定时器调用）
+    const fetchOnlineStatus = useCallback(async (friendsList = friends) => {
+        if (!friendsList || friendsList.length === 0) return;
+
+        const userIds = friendsList
+            .map(f => f.friend?.id || f.id)
+            .filter(id => id);
+
+        if (userIds.length === 0) return;
+
+        try {
+            const onlineResponse = await friendApi.batchGetUserOnlineStatus(userIds);
+            console.log('在线状态响应:', onlineResponse);
+
+            // 兼容多种返回格式
+            let statusData = {};
+            if (onlineResponse?.online_status) {
+                statusData = onlineResponse.online_status;
+            } else if (onlineResponse?.statuses) {
+                statusData = onlineResponse.statuses;
+            } else if (onlineResponse?.data?.online_status) {
+                statusData = onlineResponse.data.online_status;
+            } else {
+                // 如果格式不对，尝试直接使用对象
+                statusData = onlineResponse;
+            }
+
+            // 确保是对象格式
+            if (typeof statusData === 'object' && !Array.isArray(statusData)) {
+                setOnlineStatus(statusData);
+
+                // 计算在线好友数
+                const onlineCount = Object.values(statusData).filter(status => status === 1).length;
+                setStats(prev => ({ ...prev, online: onlineCount }));
+            } else {
+                console.warn('在线状态返回格式异常:', onlineResponse);
+            }
+        } catch (error) {
+            console.error('获取在线状态失败:', error);
+        }
+    }, [friends]);
 
     // 搜索好友
     const handleSearch = async (query) => {
@@ -122,6 +153,8 @@ const FriendList = () => {
                     };
                 });
                 setFriends(searchResults);
+                // 搜索结果也需要获取在线状态
+                fetchOnlineStatus(searchResults);
             }
         } catch (error) {
             console.error('搜索好友失败:', error);
@@ -293,9 +326,29 @@ const FriendList = () => {
         navigate(`/user/${user.id}`);
     };
 
+    // 初始加载好友列表
     useEffect(() => {
         fetchFriends();
     }, [fetchFriends]);
+
+    // 设置定时刷新在线状态（每30秒）
+    useEffect(() => {
+        if (friends.length > 0) {
+            // 立即刷新一次（首次加载后）
+            fetchOnlineStatus();
+
+            // 设置定时器
+            timerRef.current = setInterval(() => {
+                fetchOnlineStatus();
+            }, 30000); // 30秒
+
+            return () => {
+                if (timerRef.current) {
+                    clearInterval(timerRef.current);
+                }
+            };
+        }
+    }, [friends, fetchOnlineStatus]);
 
     if (loading && friends.length === 0) {
         return (

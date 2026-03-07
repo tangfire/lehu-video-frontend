@@ -24,9 +24,6 @@ export const WebSocketProvider = ({ children }) => {
     const handleNewMessage = useCallback((message) => {
         console.log('收到新消息:', message);
 
-        // 触发新消息事件，让ChatRoom组件处理
-        // 注意：这里我们不再直接更新状态，而是通过事件让组件自己处理
-
         const user = getCurrentUser();
         if (user && String(message.sender_id) !== String(user.id)) {
             setUnreadCount(prev => prev + 1);
@@ -52,8 +49,6 @@ export const WebSocketProvider = ({ children }) => {
         const serverId = info.message_id ? String(info.message_id) : null;
         const clientId = info.client_msg_id || data.client_msg_id;
 
-        console.log('发送确认信息:', { serverId, clientId, info });
-
         if (!serverId && !clientId) return;
 
         setMessageStatusUpdates(prev => {
@@ -62,21 +57,17 @@ export const WebSocketProvider = ({ children }) => {
             const updateObj = {
                 message_id: serverId,
                 client_msg_id: clientId,
-                status: 1, // SENT
+                status: 1,
                 timestamp: Date.now()
             };
 
-            // 用 client_msg_id 做升级 key
             if (clientId) {
                 newMap.set(String(clientId), updateObj);
             }
-
-            // 同时也用 serverId，方便后续 delivered/read
             if (serverId) {
                 newMap.set(String(serverId), updateObj);
             }
 
-            console.log('更新 messageStatusUpdates:', newMap);
             return newMap;
         });
     }, []);
@@ -93,12 +84,10 @@ export const WebSocketProvider = ({ children }) => {
                 const newMap = new Map(prev);
                 newMap.set(messageId, {
                     messageId: messageId,
-                    status: 2, // DELIVERED
+                    status: 2,
                     receiverId: info.receiver_id ? String(info.receiver_id) : null,
                     timestamp: Date.now()
                 });
-
-                console.log('消息已送达更新:', newMap);
                 return newMap;
             });
         }
@@ -116,11 +105,10 @@ export const WebSocketProvider = ({ children }) => {
                 const newMap = new Map(prev);
                 newMap.set(messageId, {
                     messageId: messageId,
-                    status: 3, // READ
+                    status: 3,
                     readerId: info.reader_id ? String(info.reader_id) : null,
                     timestamp: Date.now()
                 });
-
                 return newMap;
             });
         }
@@ -132,7 +120,7 @@ export const WebSocketProvider = ({ children }) => {
         setMessageStatusUpdates(prev => {
             const newMap = new Map(prev);
             newMap.set(String(client_msg_id), {
-                status: 99, // 发送失败
+                status: 99,
                 error
             });
             return newMap;
@@ -151,11 +139,10 @@ export const WebSocketProvider = ({ children }) => {
                 const newMap = new Map(prev);
                 newMap.set(messageId, {
                     messageId: messageId,
-                    status: 4, // RECALLED
+                    status: 4,
                     recalledBy: info.recalled_by ? String(info.recalled_by) : null,
                     timestamp: Date.now()
                 });
-
                 return newMap;
             });
         }
@@ -210,18 +197,6 @@ export const WebSocketProvider = ({ children }) => {
         }
     }, []);
 
-    // 监听连接状态变化并自动重连
-    useEffect(() => {
-        if (connectionStatus === 'disconnected') {
-            const timer = setTimeout(() => {
-                console.log('尝试重新连接WebSocket...');
-                connectWebSocket();
-            }, 3000);
-
-            return () => clearTimeout(timer);
-        }
-    }, [connectionStatus, connectWebSocket]);
-
     // 获取消息状态更新
     const getMessageStatusUpdate = useCallback((id) => {
         return messageStatusUpdates.get(String(id));
@@ -253,19 +228,10 @@ export const WebSocketProvider = ({ children }) => {
         webSocketAPI.onMessageRecalled(handleMessageRecalled);
         webSocketAPI.onTyping(handleTyping);
         webSocketAPI.onNotification(handleNotification);
-        // 添加 not_friend 监听
         webSocketAPI.onNotFriend(handleNotFriend);
 
-        // 检查用户是否登录并连接
-        const checkAndConnect = () => {
-            const token = localStorage.getItem('token');
-            if (token) {
-                connectWebSocket();
-            }
-        };
-
         // 初始连接
-        checkAndConnect();
+        connectWebSocket();
 
         // 监听登录状态变化
         const handleStorageChange = (e) => {
@@ -287,7 +253,6 @@ export const WebSocketProvider = ({ children }) => {
         return () => {
             webSocketAPI.disconnect();
 
-            // 清理所有事件监听器
             if (cleanupConnectionStatus && typeof cleanupConnectionStatus === 'function') {
                 cleanupConnectionStatus();
             }

@@ -5,22 +5,21 @@ class WebSocketManager {
         this.listeners = new Map();
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 5;
-        this.reconnectInterval = null;
         this.heartbeatInterval = null;
         this.lastHeartbeatTime = null;
         this.connectionCheckInterval = null;
+        this.currentToken = null; // 保存当前token用于重连
     }
 
     connect(token) {
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            console.warn('已有 WebSocket 连接，等待断开或复用...');
+            console.warn('已有 WebSocket 连接，跳过');
             return;
         }
 
-        // 使用正确的 URL 格式
+        this.currentToken = token;
         const wsBase = import.meta.env.VITE_WS_URL || `ws://${window.location.host}`;
         const url = `${wsBase}?token=${encodeURIComponent(token)}`;
-
         console.log('连接 WebSocket:', url);
 
         this.ws = new WebSocket(url);
@@ -31,11 +30,7 @@ class WebSocketManager {
             this.emit('connection_established');
             this.emit('connection_status', 'connected');
 
-            // 发送认证消息
-            this.send({
-                action: 'auth',
-                timestamp: Date.now()
-            });
+            this.send({ action: 'auth', timestamp: Date.now() });
 
             this.startHeartbeat();
             this.startConnectionCheck();
@@ -56,22 +51,35 @@ class WebSocketManager {
             this.stopHeartbeat();
             this.stopConnectionCheck();
 
-            // 触发连接状态更新
             this.emit('connection_status', 'disconnected');
 
-            // 如果是被后端主动踢掉的（带有特定原因），不要自动重连
-            if (event.reason === 'replaced by new connection' || event.code === 1000) {
-                console.warn('连接被新会话替换或手动关闭，停止自动重连');
+            // 正常关闭（1000）或被新连接替换，不重连
+            if (event.code === 1000 || event.reason === 'replaced by new connection') {
+                console.warn('连接正常关闭或被新会话替换，停止自动重连');
                 return;
             }
 
-            // 只有非正常关闭才进行带退避算法的重连
+            // 认证失败（token无效）—— 停止重连，建议跳转登录
+            if (event.code === 1008 ||
+                (event.reason && (event.reason.includes('auth') || event.reason.includes('token')))) {
+                console.error('认证失败，停止重连，请重新登录');
+                // 可以在这里触发全局登出（如清除token、跳转登录页）
+                // 但为避免循环，仅打印错误
+                return;
+            }
+
+            // 非正常关闭，尝试重连
             if (this.reconnectAttempts < this.maxReconnectAttempts) {
                 const backoffDelay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 10000);
+                console.log(`尝试重连 (${this.reconnectAttempts + 1}/${this.maxReconnectAttempts})，延迟 ${backoffDelay}ms`);
                 setTimeout(() => {
                     this.reconnectAttempts++;
-                    this.connect(token);
+                    if (this.currentToken) {
+                        this.connect(this.currentToken);
+                    }
                 }, backoffDelay);
+            } else {
+                console.error('达到最大重连次数，停止重连');
             }
         };
 
@@ -82,16 +90,11 @@ class WebSocketManager {
         };
     }
 
-    // 心跳机制
     startHeartbeat() {
         this.stopHeartbeat();
-
         this.heartbeatInterval = setInterval(() => {
             if (this.isConnected()) {
-                this.send({
-                    action: 'ping',
-                    timestamp: Date.now()
-                });
+                this.send({ action: 'ping', timestamp: Date.now() });
                 this.lastHeartbeatTime = Date.now();
             }
         }, 30000);
@@ -104,13 +107,10 @@ class WebSocketManager {
         }
     }
 
-    // 连接检查
     startConnectionCheck() {
         this.stopConnectionCheck();
-
         this.connectionCheckInterval = setInterval(() => {
             if (this.isConnected()) {
-                // 如果超过60秒没有收到心跳响应，认为连接断开
                 if (this.lastHeartbeatTime && Date.now() - this.lastHeartbeatTime > 60000) {
                     console.warn('心跳超时，重新连接...');
                     this.reconnect();
@@ -126,24 +126,18 @@ class WebSocketManager {
         }
     }
 
-    // 重新连接
     reconnect() {
-        const token = localStorage.getItem('token');
-        if (token) {
+        if (this.currentToken) {
             this.disconnect();
-            setTimeout(() => {
-                this.connect(token);
-            }, 1000);
+            setTimeout(() => this.connect(this.currentToken), 1000);
         }
     }
 
-    // 发送消息通用方法
     send(data) {
-        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+        if (!this.isConnected()) {
             console.error('WebSocket未连接');
             return false;
         }
-
         try {
             const message = typeof data === 'string' ? data : JSON.stringify(data);
             this.ws.send(message);
@@ -155,74 +149,58 @@ class WebSocketManager {
         }
     }
 
-    // 发送消息
     sendMessage(data) {
-        const message = {
+        return this.send({
             action: 'send_message',
             data: {
                 ...data,
-                // 确保所有ID都是字符串
                 receiver_id: String(data.receiver_id),
                 client_msg_id: data.client_msg_id || `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
             },
             timestamp: Date.now()
-        };
-        console.log('发送消息:', message);
-        return this.send(message);
+        });
     }
 
-    // 发送已读回执
     sendReadReceipt(conversationId, messageId) {
-        const message = {
+        return this.send({
             action: 'read_message',
             data: {
                 conversation_id: String(conversationId),
                 message_id: String(messageId)
             },
             timestamp: Date.now()
-        };
-        return this.send(message);
+        });
     }
 
-    // 撤回消息
     recallMessage(messageId) {
-        const message = {
+        return this.send({
             action: 'recall_message',
-            data: {
-                message_id: String(messageId)
-            },
+            data: { message_id: String(messageId) },
             timestamp: Date.now()
-        };
-        return this.send(message);
+        });
     }
 
-    // 发送输入状态
     sendTypingStatus(receiverId, convType, isTyping, text = '') {
-        const message = {
+        return this.send({
             action: 'typing',
             data: {
                 receiver_id: String(receiverId),
                 conv_type: convType,
                 is_typing: isTyping,
-                text: text
+                text
             },
             timestamp: Date.now()
-        };
-        return this.send(message);
+        });
     }
 
-    // 处理接收到的消息
     handleIncomingMessage(data) {
         const { action, ...rest } = data;
-        console.log('处理WebSocket消息:', action, rest);
-
         switch (action) {
             case 'new_message':
             case 'receive_message':
                 this.emit('new_message', {
                     ...rest.data,
-                    action: action,
-                    // 确保ID是字符串
+                    action,
                     id: String(rest.data?.id || rest.data?.message_id),
                     sender_id: String(rest.data?.sender_id),
                     receiver_id: String(rest.data?.receiver_id),
@@ -232,8 +210,7 @@ class WebSocketManager {
             case 'message_sent':
                 this.emit('message_sent', {
                     ...rest.data,
-                    action: action,
-                    // 确保ID是字符串
+                    action,
                     message_id: String(rest.data?.message_id),
                     client_msg_id: String(rest.data?.client_msg_id)
                 });
@@ -241,8 +218,7 @@ class WebSocketManager {
             case 'message_delivered':
                 this.emit('message_delivered', {
                     ...rest.data,
-                    action: action,
-                    // 确保ID是字符串
+                    action,
                     message_id: String(rest.data?.message_id),
                     receiver_id: String(rest.data?.receiver_id)
                 });
@@ -250,8 +226,7 @@ class WebSocketManager {
             case 'message_read':
                 this.emit('message_read', {
                     ...rest.data,
-                    action: action,
-                    // 确保ID是字符串
+                    action,
                     message_id: String(rest.data?.message_id),
                     reader_id: String(rest.data?.reader_id)
                 });
@@ -259,36 +234,30 @@ class WebSocketManager {
             case 'message_recalled':
                 this.emit('message_recalled', {
                     ...rest.data,
-                    action: action,
-                    // 确保ID是字符串
+                    action,
                     message_id: String(rest.data?.message_id),
                     recalled_by: String(rest.data?.recalled_by)
                 });
                 break;
-            case 'not_friend':  // 新增处理
-                // 处理不同可能的数据结构
-            { const notFriendData = rest.data || rest;
-
-                // 确保我们有 client_msg_id
+            case 'not_friend': {
+                const notFriendData = rest.data || rest;
                 const clientMsgId = notFriendData.client_msg_id ||
                     notFriendData.message_id ||
                     (notFriendData.data && notFriendData.data.client_msg_id);
-
                 this.emit('not_friend', {
                     ...notFriendData,
-                    action: action,
-                    // 确保 ID 是字符串
+                    action,
                     client_msg_id: clientMsgId ? String(clientMsgId) : null,
                     sender_id: notFriendData.sender_id ? String(notFriendData.sender_id) : null,
                     receiver_id: notFriendData.receiver_id ? String(notFriendData.receiver_id) : null,
                     error: notFriendData.error || notFriendData.message || '双方不是好友关系'
                 });
-                break; }
+                break;
+            }
             case 'user_typing':
                 this.emit('user_typing', {
                     ...rest.data,
-                    action: action,
-                    // 确保ID是字符串
+                    action,
                     sender_id: String(rest.data?.sender_id),
                     receiver_id: String(rest.data?.receiver_id)
                 });
@@ -314,7 +283,6 @@ class WebSocketManager {
 
     disconnect() {
         if (this.ws) {
-            // 移除所有事件监听器，避免触发 onclose 重连
             this.ws.onopen = null;
             this.ws.onclose = null;
             this.ws.onerror = null;
@@ -322,7 +290,6 @@ class WebSocketManager {
             this.ws.close();
             this.ws = null;
         }
-
         this.stopHeartbeat();
         this.stopConnectionCheck();
         this.emit('connection_status', 'disconnected');
@@ -334,16 +301,10 @@ class WebSocketManager {
 
     getConnectionStatus() {
         if (!this.ws) return 'disconnected';
-
         switch (this.ws.readyState) {
-            case WebSocket.CONNECTING:
-                return 'connecting';
-            case WebSocket.OPEN:
-                return 'connected';
-            case WebSocket.CLOSING:
-            case WebSocket.CLOSED:
-            default:
-                return 'disconnected';
+            case WebSocket.CONNECTING: return 'connecting';
+            case WebSocket.OPEN: return 'connected';
+            default: return 'disconnected';
         }
     }
 
