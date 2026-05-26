@@ -86,10 +86,17 @@
 
 .video-meta-info {
     display: flex;
+    align-items: center;
     gap: 20px;
     margin-bottom: 20px;
     color: #666;
     font-size: 14px;
+}
+
+.views-count {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .video-description {
@@ -238,7 +245,15 @@
 }
 
 .interaction-btn .icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     font-size: 24px;
+}
+
+.interaction-btn .icon svg {
+    width: 24px;
+    height: 24px;
 }
 
 .interaction-btn .count {
@@ -767,7 +782,9 @@
 }
 
 .like-error-icon {
-    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    flex: 0 0 auto;
 }
 
 .like-error-text {

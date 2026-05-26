@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getCurrentUser } from '../../api/user';
 import {followApi} from '../../api/follow';
+import { logger } from '../../utils/logger';
 import './FollowButton.css';
 
 const FollowButton = ({
@@ -14,6 +15,7 @@ const FollowButton = ({
     const [isFollowing, setIsFollowing] = useState(initialIsFollowing);
     const [loading, setLoading] = useState(false);
     const [currentUser, setCurrentUser] = useState(null);
+    const [error, setError] = useState(null);
 
     useEffect(() => {
         const user = getCurrentUser();
@@ -26,18 +28,19 @@ const FollowButton = ({
 
     const handleFollowToggle = async () => {
         if (!currentUser) {
-            alert('请先登录后再关注');
+            window.location.href = '/login';
             return;
         }
 
         if (currentUser.id === userId) {
-            alert('不能关注自己');
+            setError('不能关注自己');
             return;
         }
 
         if (loading) return;
 
         setLoading(true);
+        setError(null);
         try {
             if (isFollowing) {
                 // 取消关注
@@ -55,8 +58,8 @@ const FollowButton = ({
                 }
             }
         } catch (error) {
-            console.error('关注操作失败:', error);
-            alert(error.message || '操作失败，请稍后重试');
+            logger.warn('关注操作失败:', error);
+            setError(error.message || '操作失败，请稍后重试');
         } finally {
             setLoading(false);
         }
@@ -85,22 +88,29 @@ const FollowButton = ({
     };
 
     return (
-        <button
-            className={`follow-btn ${size} ${isFollowing ? 'following' : ''} ${loading ? 'loading' : ''} ${className}`}
-            onClick={handleFollowToggle}
-            disabled={loading}
-        >
-            {loading ? (
-                <span className="follow-loading">
-                    <span className="loading-dot"></span>
+        <span className="follow-btn-wrap">
+            <button
+                className={`follow-btn ${size} ${isFollowing ? 'following' : ''} ${loading ? 'loading' : ''} ${className}`}
+                onClick={handleFollowToggle}
+                disabled={loading}
+            >
+                {loading ? (
+                    <span className="follow-loading">
+                        <span className="loading-dot"></span>
+                    </span>
+                ) : (
+                    <>
+                        {isFollowing ? '✓' : '+'}
+                        {showText && <span className="follow-text">{getButtonText()}</span>}
+                    </>
+                )}
+            </button>
+            {error && (
+                <span className="follow-inline-error" onClick={() => setError(null)}>
+                    {error}
                 </span>
-            ) : (
-                <>
-                    {isFollowing ? '✓' : '+'}
-                    {showText && <span className="follow-text">{getButtonText()}</span>}
-                </>
             )}
-        </button>
+        </span>
     );
 };
 

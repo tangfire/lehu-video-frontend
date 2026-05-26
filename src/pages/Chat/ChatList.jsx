@@ -5,6 +5,7 @@ import { messageApi } from '../../api/message';
 import { useWebSocket } from '../../components/WebSocket/WebSocketProvider';
 import { useChat } from '../../context/chatContext';
 import { getCurrentUser } from '../../api/user';
+import { logger } from '../../utils/logger';
 import './Chat.css';
 
 const ChatList = () => {
@@ -14,6 +15,7 @@ const ChatList = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [filteredConversations, setFilteredConversations] = useState([]);
     const [error, setError] = useState(null);
+    const [notice, setNotice] = useState(null);
     const [refreshing, setRefreshing] = useState(false);
     const [hasMore, setHasMore] = useState(true);
     const [page, setPage] = useState(1);
@@ -21,13 +23,18 @@ const ChatList = () => {
 
     const currentUser = getCurrentUser();
     // ✅ 从 useWebSocket 中取出 onMessage 和 offMessage
-    const { unreadCount, connectionStatus, reconnect, onMessage, offMessage } = useWebSocket();
-    const { cacheConversation, cacheUser, getCachedConversation } = useChat();
+    const { connectionStatus, reconnect, onMessage, offMessage } = useWebSocket();
+    const { cacheConversation, getCachedConversation } = useChat();
 
     // 使用 ref 来存储请求状态和定时器
     const fetchTimeoutRef = useRef(null);
     const isFetchingRef = useRef(false);
     const lastFetchTimeRef = useRef(0);
+
+    const showNotice = useCallback((type, text) => {
+        setNotice({ type, text });
+        window.setTimeout(() => setNotice(null), 3000);
+    }, []);
 
     // 防抖函数
     const debounce = (func, wait) => {
@@ -87,14 +94,12 @@ const ChatList = () => {
 
         // 防重处理：如果正在请求，则跳过
         if (isFetchingRef.current && !isRefresh) {
-            console.log('正在请求中，跳过此次请求');
             return;
         }
 
         const now = Date.now();
         // 防刷处理：1秒内不重复请求（除非是手动刷新）
         if (!isRefresh && now - lastFetchTimeRef.current < 1000) {
-            console.log('请求过于频繁，跳过');
             return;
         }
 
@@ -185,7 +190,7 @@ const ChatList = () => {
                 setFilteredConversations([]);
             }
         } catch (error) {
-            console.error('获取会话列表失败:', error);
+            logger.warn('获取会话列表失败:', error);
             // 如果不是取消请求的错误，才显示错误信息
             if (error.message !== '重复请求已取消') {
                 setError('获取会话列表失败，请检查网络连接');
@@ -230,8 +235,8 @@ const ChatList = () => {
             setFilteredConversations(prev => prev.filter(conv => conv.id !== conversationId));
 
         } catch (error) {
-            console.error('删除会话失败:', error);
-            alert('删除失败，请重试');
+            logger.warn('删除会话失败:', error);
+            showNotice('error', '删除失败，请重试');
         }
     };
 
@@ -256,7 +261,7 @@ const ChatList = () => {
                         cacheConversation(convDetail.conversation);
                     }
                 } catch (e) {
-                    console.warn('获取会话详情失败，但创建成功:', e);
+                    logger.warn('获取会话详情失败，但创建成功:', e);
                 }
 
                 fetchConversations(1, true);
@@ -274,11 +279,11 @@ const ChatList = () => {
                 });
             }
         } catch (error) {
-            console.error('创建会话失败:', error);
+            logger.warn('创建会话失败:', error);
             const errorMsg = type === 'single'
                 ? '创建会话失败，请检查好友关系或网络连接'
                 : '创建会话失败，请检查是否已加入该群';
-            alert(errorMsg);
+            showNotice('error', errorMsg);
         }
     };
 
@@ -301,8 +306,7 @@ const ChatList = () => {
                     replace: true
                 });
             } else {
-                console.error('无法找到对方用户ID');
-                alert('无法开始聊天：未找到对方用户');
+                showNotice('error', '无法开始聊天：未找到对方用户');
             }
         } else {
             const groupId = conversation.group_id || conversation.target_id;
@@ -318,11 +322,10 @@ const ChatList = () => {
                     replace: true
                 });
             } else {
-                console.error('无法找到群组ID');
-                alert('无法开始聊天：未找到群组');
+                showNotice('error', '无法开始聊天：未找到群组');
             }
         }
-    }, [navigate, currentUser, getCachedConversation]);
+    }, [navigate, currentUser, getCachedConversation, showNotice]);
 
     // 清空聊天记录
     const handleClearMessages = async (conversationId, e) => {
@@ -334,7 +337,7 @@ const ChatList = () => {
 
         try {
             await messageApi.clearMessages(conversationId);
-            alert('聊天记录已清空');
+            showNotice('success', '聊天记录已清空');
 
             setConversations(prev => prev.map(conv => {
                 if (conv.id === conversationId) {
@@ -360,8 +363,8 @@ const ChatList = () => {
                 return conv;
             }));
         } catch (error) {
-            console.error('清空聊天记录失败:', error);
-            alert('清空失败，请重试');
+            logger.warn('清空聊天记录失败:', error);
+            showNotice('error', '清空失败，请重试');
         }
     };
 
@@ -387,7 +390,7 @@ const ChatList = () => {
                 return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
             }
         } catch (error) {
-            console.error('格式化时间错误:', error);
+            logger.warn('格式化时间错误:', error);
             return '';
         }
     };
@@ -469,8 +472,6 @@ const ChatList = () => {
     // ========== 正确监听 WebSocket 新消息 ==========
     useEffect(() => {
         const handleNewMessage = (message) => {
-            console.log('📩 ChatList 收到消息:', message);
-
             // 提取消息数据（兼容两种结构）
             const data = message.data || message;
             if (!data.conversation_id) return;
@@ -610,6 +611,12 @@ const ChatList = () => {
 
     return (
         <div className="chat-list-page">
+            {notice && (
+                <div className={`chat-list-notice ${notice.type}`}>
+                    {notice.text}
+                </div>
+            )}
+
             <div className="chat-list-header">
                 <h2>消息</h2>
                 <div className="chat-list-actions">

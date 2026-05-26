@@ -13,7 +13,8 @@ export const videoApi = {
         const processedData = ensureInt64Fields({
             latest_time: data.latest_time || 0,
             user_id: data.user_id || "0",
-            feed_num: data.feed_num || 10
+            feed_num: data.feed_num || 10,
+            feed_type: data.feed_type ?? 1
         });
         return request.post('/video/feed', processedData);
     },
@@ -53,13 +54,16 @@ export const videoApi = {
 
     // 报告视频上传完成
     reportVideoFinishUpload: (data) => {
-        const processedData = ensureInt64Fields({
+        const payload = {
             file_id: String(data.file_id),
             title: data.title,
-            cover_url: data.cover_url,
             description: data.description || '',
             video_url: data.video_url
-        });
+        };
+        if (data.cover_url) {
+            payload.cover_url = data.cover_url;
+        }
+        const processedData = ensureInt64Fields(payload);
         return request.post('/video/finish', processedData);
     },
 

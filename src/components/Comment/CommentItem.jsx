@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FiHeart, FiMessageCircle, FiMoreVertical } from 'react-icons/fi';
 import { FaThumbsDown } from 'react-icons/fa';
+import { logger } from '../../utils/logger';
 import './CommentItem.css';
 
 const DEFAULT_AVATAR = '/default-avatar.png';
@@ -27,6 +28,7 @@ const CommentItem = ({
     const [isSubmittingReply, setIsSubmittingReply] = useState(false);
     const [isLiking, setIsLiking] = useState(false);
     const [isDisliking, setIsDisliking] = useState(false);
+    const [error, setError] = useState(null);
 
     // 安全地获取用户信息
     const user = comment?.user || {
@@ -46,15 +48,17 @@ const CommentItem = ({
 
     const handleLike = async () => {
         if (!currentUserId) {
-            alert('请先登录后才能点赞评论');
+            setError('请先登录后才能点赞评论');
             return;
         }
         if (isLiking) return;
         setIsLiking(true);
+        setError(null);
         try {
             await onLike(comment.id, comment.isLiked);
         } catch (error) {
-            console.error('点赞操作失败:', error);
+            logger.warn('点赞操作失败:', error);
+            setError('点赞失败，请稍后重试');
         } finally {
             setIsLiking(false);
         }
@@ -62,15 +66,17 @@ const CommentItem = ({
 
     const handleDislike = async () => {
         if (!currentUserId) {
-            alert('请先登录后才能点踩评论');
+            setError('请先登录后才能点踩评论');
             return;
         }
         if (isDisliking) return;
         setIsDisliking(true);
+        setError(null);
         try {
             await onDislike(comment.id, comment.isDisliked);
         } catch (error) {
-            console.error('点踩操作失败:', error);
+            logger.warn('点踩操作失败:', error);
+            setError('点踩失败，请稍后重试');
         } finally {
             setIsDisliking(false);
         }
@@ -99,11 +105,12 @@ const CommentItem = ({
 
         const contentToSubmit = replyContent || localReplyContent;
         if (!contentToSubmit.trim()) {
-            alert('回复内容不能为空');
+            setError('回复内容不能为空');
             return;
         }
 
         setIsSubmittingReply(true);
+        setError(null);
         try {
             const success = await onReplySubmit(comment.id, contentToSubmit);
             if (success) {
@@ -112,7 +119,8 @@ const CommentItem = ({
                 if (onToggleReply) onToggleReply(null);
             }
         } catch (error) {
-            console.error('提交回复失败:', error);
+            logger.warn('提交回复失败:', error);
+            setError('回复失败，请稍后重试');
         } finally {
             setIsSubmittingReply(false);
         }
@@ -156,6 +164,11 @@ const CommentItem = ({
                 </Link>
 
                 <div className="comment-body">
+                    {error && (
+                        <div className="comment-inline-error" onClick={() => setError(null)}>
+                            {error}
+                        </div>
+                    )}
                     <div className="comment-header">
                         <div className="comment-user-info">
                             <Link

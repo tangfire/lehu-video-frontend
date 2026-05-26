@@ -1,30 +1,25 @@
 .home-container {
     min-height: 100vh;
-    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: #f6f7f9;
 }
 
-/* 移除 .home-header 相关样式 */
-
-/* 固定导航栏 - 修复 z-index 问题 */
 .sticky-nav {
     position: sticky;
-    top: 70px; /* 匹配Header高度 */
-    z-index: 500; /* 降低z-index，让Header下拉菜单可以覆盖 */
-    background: rgba(255, 255, 255, 0.98);
-    backdrop-filter: blur(20px);
-    box-shadow: 0 2px 15px rgba(0, 0, 0, 0.05);
+    top: 70px;
+    z-index: 500;
+    background: rgba(255, 255, 255, 0.96);
+    border-bottom: 1px solid #eceff3;
+    backdrop-filter: blur(16px);
 }
 
 .home-tabs {
-    max-width: 1200px;
+    max-width: 1240px;
     margin: 0 auto;
     padding: 0 20px;
     display: flex;
-    gap: 5px;
+    gap: 4px;
     overflow-x: auto;
     scrollbar-width: none;
-    -ms-overflow-style: none;
 }
 
 .home-tabs::-webkit-scrollbar {
@@ -32,374 +27,301 @@
 }
 
 .tab-button {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 8px;
-    padding: 14px 24px;
+    min-height: 48px;
+    padding: 0 18px;
     background: transparent;
     border: none;
-    border-radius: 12px;
-    font-size: 15px;
-    font-weight: 500;
-    color: #666;
+    border-bottom: 2px solid transparent;
+    color: #667085;
     cursor: pointer;
-    transition: all 0.3s ease;
+    font-size: 15px;
+    font-weight: 600;
     white-space: nowrap;
-    position: relative;
-    overflow: hidden;
 }
 
 .tab-button:hover {
-    background: rgba(102, 126, 234, 0.05);
-    color: #667eea;
-    transform: translateY(-1px);
+    color: #111827;
 }
 
 .tab-button.active {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
-}
-
-.tab-button.active::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 20px;
-    height: 3px;
-    background: white;
-    border-radius: 2px;
+    color: #fe2c55;
+    border-bottom-color: #fe2c55;
 }
 
 .tab-icon {
+    display: flex;
+    align-items: center;
     font-size: 18px;
-    display: flex;
-    align-items: center;
 }
 
-/* 主内容区域 */
 .home-content {
-    max-width: 1200px;
+    max-width: 1240px;
     margin: 0 auto;
-    padding: 30px 20px;
+    padding: 24px 20px 56px;
 }
 
-/* 欢迎横幅 */
-.welcome-banner {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border-radius: 20px;
-    padding: 40px;
-    margin-bottom: 40px;
-    color: white;
+.feed-toolbar {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    position: relative;
-    overflow: hidden;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 18px;
 }
 
-.welcome-banner::before {
-    content: '';
-    position: absolute;
-    top: -50%;
-    right: -50%;
-    width: 200%;
-    height: 200%;
-    background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
-    background-size: 20px 20px;
-    opacity: 0.1;
+.feed-toolbar h1 {
+    font-size: 24px;
+    line-height: 1.2;
+    color: #111827;
+    margin: 0 0 4px;
 }
 
-.banner-content h2 {
-    font-size: 32px;
-    font-weight: 700;
-    margin-bottom: 10px;
-}
-
-.banner-content p {
-    font-size: 16px;
-    opacity: 0.9;
-}
-
-.banner-stats {
-    display: flex;
-    gap: 40px;
-}
-
-.stat {
-    text-align: center;
-}
-
-.stat .number {
-    display: block;
-    font-size: 28px;
-    font-weight: 700;
-    margin-bottom: 5px;
-}
-
-.stat .label {
+.feed-toolbar p {
+    color: #667085;
+    margin: 0;
     font-size: 14px;
-    opacity: 0.8;
 }
 
-/* 视频网格 */
+.feed-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.icon-action,
+.publish-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 40px;
+    padding: 0 14px;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 14px;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.icon-action {
+    border: 1px solid #d0d5dd;
+    background: white;
+    color: #344054;
+}
+
+.publish-action {
+    border: 1px solid #fe2c55;
+    background: #fe2c55;
+    color: white;
+}
+
+.icon-action:hover,
+.publish-action:hover {
+    transform: translateY(-1px);
+}
+
+.icon-action:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
 .video-feed {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 25px;
-    margin-bottom: 50px;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    gap: 18px;
 }
 
-/* 加载更多 */
 .load-more {
     text-align: center;
-    margin: 60px 0 40px;
+    margin: 36px 0 12px;
 }
 
 .load-more-btn {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 10px;
-    padding: 16px 40px;
+    min-height: 44px;
+    padding: 0 24px;
+    border: 1px solid #d0d5dd;
+    border-radius: 8px;
     background: white;
-    border: 2px solid rgba(102, 126, 234, 0.2);
-    border-radius: 50px;
-    font-size: 16px;
-    font-weight: 600;
-    color: #667eea;
+    color: #344054;
     cursor: pointer;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+    font-weight: 700;
 }
 
 .load-more-btn:hover:not(:disabled) {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border-color: transparent;
-    transform: translateY(-2px);
-    box-shadow: 0 8px 30px rgba(102, 126, 234, 0.4);
+    border-color: #fe2c55;
+    color: #fe2c55;
 }
 
 .load-more-btn:disabled {
-    opacity: 0.7;
+    opacity: 0.65;
     cursor: not-allowed;
 }
 
 .spinner {
     width: 16px;
     height: 16px;
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    border-top-color: white;
+    border: 2px solid #f2b3c0;
+    border-top-color: #fe2c55;
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
 }
 
 @keyframes spin {
-    to { transform: rotate(360deg); }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
-/* 加载动画 */
 .home-loading {
+    min-height: 70vh;
     display: flex;
     flex-direction: column;
-    align-items: center;
     justify-content: center;
-    min-height: 70vh;
-    text-align: center;
+    align-items: center;
+    gap: 18px;
+    color: #667085;
 }
 
 .loading-animation {
     display: flex;
     gap: 8px;
-    margin-bottom: 20px;
 }
 
 .pulse {
-    width: 12px;
-    height: 12px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    width: 10px;
+    height: 10px;
     border-radius: 50%;
-    animation: pulse 1.4s ease-in-out infinite;
+    background: #fe2c55;
+    animation: pulse 1.2s ease-in-out infinite;
 }
 
 .pulse.delay-1 {
-    animation-delay: 0.2s;
+    animation-delay: 0.15s;
 }
 
 .pulse.delay-2 {
-    animation-delay: 0.4s;
+    animation-delay: 0.3s;
 }
 
 @keyframes pulse {
     0%, 100% {
-        transform: scale(0.8);
-        opacity: 0.5;
+        opacity: 0.35;
+        transform: scale(0.85);
     }
     50% {
-        transform: scale(1.2);
         opacity: 1;
+        transform: scale(1.15);
     }
 }
 
-.home-loading p {
-    color: #666;
-    font-size: 16px;
-    margin-top: 20px;
-}
-
-/* 错误横幅 */
 .error-banner {
-    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
-    border-radius: 12px;
-    padding: 20px;
-    margin-bottom: 20px;
-    color: white;
-    animation: fadeIn 0.3s ease;
+    background: #fff5f6;
+    border: 1px solid #ffd5de;
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-bottom: 18px;
+    color: #b4233b;
 }
 
 .error-content {
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    justify-content: space-between;
+    gap: 16px;
 }
 
 .error-content p {
     margin: 0;
-    font-size: 14px;
 }
 
 .retry-btn {
-    background: rgba(255, 255, 255, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.3);
+    border: 1px solid #fe2c55;
+    background: #fe2c55;
     color: white;
-    padding: 8px 16px;
-    border-radius: 20px;
-    font-size: 14px;
+    border-radius: 8px;
+    padding: 8px 14px;
     cursor: pointer;
-    transition: all 0.3s;
+    font-weight: 700;
 }
 
-.retry-btn:hover {
-    background: rgba(255, 255, 255, 0.3);
-}
-
-/* 空状态 */
 .empty-videos {
-    text-align: center;
-    padding: 60px 20px;
+    min-height: 340px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
     background: white;
-    border-radius: 12px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    border: 1px solid #eceff3;
+    border-radius: 8px;
+    color: #667085;
+    text-align: center;
+    padding: 36px 20px;
 }
 
 .empty-icon {
-    font-size: 60px;
-    margin-bottom: 20px;
-    opacity: 0.5;
+    width: 44px;
+    height: 44px;
+    color: #98a2b3;
 }
 
 .empty-videos h3 {
-    font-size: 20px;
-    color: #333;
-    margin-bottom: 10px;
+    color: #111827;
+    font-size: 18px;
+    margin: 0;
 }
 
 .empty-videos p {
-    color: #666;
-    margin-bottom: 20px;
+    margin: 0 0 6px;
 }
 
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(-10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-/* 移除底部信息样式 */
-
-/* 响应式设计 */
 @media (max-width: 768px) {
     .sticky-nav {
-        top: 60px; /* 移动端Header高度 */
+        top: 60px;
     }
 
     .home-tabs {
-        padding: 0 15px;
-    }
-
-    .tab-button {
-        padding: 12px 18px;
-        font-size: 14px;
+        padding: 0 12px;
     }
 
     .home-content {
-        padding: 20px 15px;
+        padding: 18px 12px 44px;
     }
 
-    .welcome-banner {
-        flex-direction: column;
-        text-align: center;
-        gap: 25px;
-        padding: 30px 20px;
+    .feed-toolbar {
+        align-items: flex-start;
     }
 
-    .banner-content h2 {
-        font-size: 26px;
-    }
-
-    .banner-stats {
-        gap: 30px;
-    }
-
-    .stat .number {
-        font-size: 24px;
-    }
-
-    .video-feed {
-        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-        gap: 15px;
-    }
-
-    .load-more-btn {
-        padding: 14px 30px;
-        font-size: 15px;
-    }
-}
-
-@media (max-width: 480px) {
-    .tab-button .tab-text {
-        display: none;
-    }
-
-    .tab-button {
-        padding: 10px;
-    }
-
-    .tab-icon {
+    .feed-toolbar h1 {
         font-size: 20px;
     }
 
+    .feed-actions span {
+        display: none;
+    }
+
+    .icon-action,
+    .publish-action {
+        width: 40px;
+        padding: 0;
+    }
+
     .video-feed {
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 10px;
     }
+}
 
-    .welcome-banner {
-        padding: 25px 15px;
-    }
-
-    .banner-content h2 {
-        font-size: 22px;
-    }
-
-    .banner-content p {
+@media (max-width: 420px) {
+    .tab-button {
+        padding: 0 14px;
         font-size: 14px;
     }
 }

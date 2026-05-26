@@ -4,10 +4,11 @@ import { getCurrentUser } from '../../api/user';
 import { commentApi, formatCommentData, buildCommentTree } from '../../api/comment';
 import { favoriteApi } from '../../api/favorite';
 import { debounce } from '../../utils/favoriteHelper';
+import { logger } from '../../utils/logger';
 import CommentItem from './CommentItem';
 import './CommentList.css';
 
-const CommentList = forwardRef(({ videoId, initialComments = [] }, ref) => {
+const CommentList = forwardRef(({ videoId }, ref) => {
     const [comments, setComments] = useState([]);
     const [loading, setLoading] = useState(false);
     const [page, setPage] = useState(1);
@@ -75,7 +76,7 @@ const CommentList = forwardRef(({ videoId, initialComments = [] }, ref) => {
 
             return updateComments(commentsList);
         } catch (err) {
-            console.error('批量获取点赞状态失败:', err);
+            logger.warn('批量获取点赞状态失败:', err);
             return commentsList;
         }
     };
@@ -142,7 +143,7 @@ const CommentList = forwardRef(({ videoId, initialComments = [] }, ref) => {
 
             setPage(pageNum);
         } catch (error) {
-            console.error('加载评论失败:', error);
+            logger.warn('加载评论失败:', error);
             setError(`加载评论失败: ${error.message || '未知错误'}`);
         } finally {
             setLoading(false);
@@ -253,7 +254,7 @@ const CommentList = forwardRef(({ videoId, initialComments = [] }, ref) => {
                 })
             );
         } catch (error) {
-            console.error('加载子评论失败:', error);
+            logger.warn('加载子评论失败:', error);
             // 清除加载状态
             setComments(prev =>
                 prev.map(c => {
@@ -272,7 +273,7 @@ const CommentList = forwardRef(({ videoId, initialComments = [] }, ref) => {
                     return c;
                 })
             );
-            alert('加载子评论失败，请稍后重试');
+            setError('加载子评论失败，请稍后重试');
         }
     };
 
@@ -329,7 +330,7 @@ const CommentList = forwardRef(({ videoId, initialComments = [] }, ref) => {
                 return true;
             }
         } catch (error) {
-            console.error('回复评论失败:', error);
+            logger.warn('回复评论失败:', error);
             setError(`回复评论失败: ${error.message || '未知错误'}`);
             return false;
         }
@@ -339,7 +340,7 @@ const CommentList = forwardRef(({ videoId, initialComments = [] }, ref) => {
     const handleFavoriteAction = useCallback(
         debounce(async (commentId, actionType, isCurrentlyActive) => {
             if (!currentUser) {
-                alert('请先登录后才能操作');
+                setError('请先登录后才能操作');
                 return;
             }
 
@@ -386,8 +387,8 @@ const CommentList = forwardRef(({ videoId, initialComments = [] }, ref) => {
 
                 setComments(prev => updateCommentState(prev));
             } catch (error) {
-                console.error('操作失败:', error);
-                alert('操作失败，请稍后重试');
+                logger.warn('评论互动失败:', error);
+                setError('操作失败，请稍后重试');
             }
         }, 300),
         [currentUser]
@@ -413,7 +414,7 @@ const CommentList = forwardRef(({ videoId, initialComments = [] }, ref) => {
             setComments(prev => removeComment(prev));
             setTotalCount(prev => prev - 1);
         } catch (error) {
-            console.error('删除评论失败:', error);
+            logger.warn('删除评论失败:', error);
             setError('删除评论失败，请稍后重试');
         }
     };

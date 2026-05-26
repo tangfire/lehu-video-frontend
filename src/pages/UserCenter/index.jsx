@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { getCurrentUser, getUserDisplayName, getUserAvatar, getUserBackground, formatUserStats } from '../../api/user';
+import { getCurrentUser, getUserDisplayName, getUserAvatar, getUserBackground } from '../../api/user';
 import { userApi } from '../../api/user';
 import { videoApi } from '../../api/video';
-import { followApi } from '../../api/follow';
 import { friendApi } from '../../api/friend';
 import VideoCard from '../../components/Common/VideoCard';
 import FollowList from '../../components/Follow/FollowList';

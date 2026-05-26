@@ -1,6 +1,7 @@
 // src/api/comment.js
 import request from '../utils/request';
 import { ensureInt64Fields } from '../utils/dataFormat';
+import { logger } from '../utils/logger';
 
 export const commentApi = {
     // 创建评论
@@ -133,7 +134,7 @@ export const formatCommentTime = (dateString) => {
             month: 'long',
             day: 'numeric'
         });
-    } catch (error) {
+    } catch {
         return dateString;
     }
 };
@@ -171,7 +172,7 @@ export const buildCommentTree = (comments) => {
                 parent.comments.push(node);
             } else {
                 // 如果找不到父评论，作为根评论处理
-                console.warn(`找不到父评论 ${formattedComment.parentId}，将评论 ${formattedComment.id} 作为根评论`);
+                logger.warn(`找不到父评论 ${formattedComment.parentId}，将评论 ${formattedComment.id} 作为根评论`);
                 rootComments.push(node);
             }
         }
@@ -183,7 +184,7 @@ export const buildCommentTree = (comments) => {
             const dateA = new Date(a.date);
             const dateB = new Date(b.date);
             return dateB - dateA;
-        } catch (e) {
+        } catch {
             return 0;
         }
     });
@@ -196,7 +197,7 @@ export const buildCommentTree = (comments) => {
                     const dateA = new Date(a.date);
                     const dateB = new Date(b.date);
                     return dateA - dateB;
-                } catch (e) {
+                } catch {
                     return 0;
                 }
             });

@@ -1,6 +1,7 @@
 // src/api/favorite.js
 import request from '../utils/request';
 import { ensureInt64Fields } from '../utils/dataFormat';
+import { logger } from '../utils/logger';
 
 const favoriteApi = {
     // 通用添加收藏/点赞
@@ -45,7 +46,7 @@ const favoriteApi = {
                 type: 0, // type 不影响，后端会返回实际类型
                 id
             }).catch(err => {
-                console.warn(`获取点赞状态失败 id=${id}`, err);
+                logger.warn(`获取点赞状态失败 id=${id}`, err);
                 return null;
             })
         );

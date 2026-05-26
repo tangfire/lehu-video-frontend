@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { FiEye, FiHeart, FiMessageCircle } from 'react-icons/fi';
+import { FALLBACK_COVER } from '../../utils/dataFormat';
 import './VideoCard.css';
 
 const VideoCard = ({ video }) => {
@@ -8,7 +9,7 @@ const VideoCard = ({ video }) => {
         if (video.cover_url) return video.cover_url;
         if (video.thumbnail) return video.thumbnail;
         if (video.coverUrl) return video.coverUrl;
-        return 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80';
+        return FALLBACK_COVER;
     };
 
     // 获取头像URL
@@ -28,10 +29,9 @@ const VideoCard = ({ video }) => {
                         loading="lazy"
                         onError={(e) => {
                             e.target.onerror = null;
-                            e.target.src = 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80';
+                            e.target.src = FALLBACK_COVER;
                         }}
                     />
-                    <div className="video-duration">{video.duration || '0:00'}</div>
                     <div className="video-overlay"></div>
                 </div>
 

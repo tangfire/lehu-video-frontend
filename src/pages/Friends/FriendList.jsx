@@ -4,7 +4,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { friendApi } from '../../api/friend';
 import { messageApi } from '../../api/message';
 import SearchUsers from '../../components/User/SearchUsers';
-import { getCurrentUser } from '../../api/user';
 import './Friends.css';
 
 const FriendList = () => {
@@ -283,7 +282,6 @@ const FriendList = () => {
 
     // 过滤好友
     const filteredFriends = friends.filter(friend => {
-        const friendId = friend.friend?.id || friend.id;
         const friendName = friend.remark || friend.friend?.name || friend.name || '';
         const friendUsername = friend.friend?.username || '';
 

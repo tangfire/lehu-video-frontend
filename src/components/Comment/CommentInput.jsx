@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { commentApi } from '../../api/comment';
+import { logger } from '../../utils/logger';
 import './CommentInput.css';
 
 const DEFAULT_AVATAR = '/default-avatar.png';
@@ -51,7 +52,7 @@ const CommentInput = ({
                 }
             }
         } catch (error) {
-            console.error('发表评论失败:', error);
+            logger.warn('发表评论失败:', error);
             setError(`发表失败: ${error.message || '未知错误'}`);
         } finally {
             setLoading(false);

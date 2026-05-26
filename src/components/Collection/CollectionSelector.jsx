@@ -4,6 +4,7 @@ import { FiFolderPlus, FiCheck } from 'react-icons/fi';
 import { collectionApi } from '../../api/collection';
 import CollectionItem from './CollectionItem';
 import CollectionModal from './CollectionModal';
+import { logger } from '../../utils/logger';
 import './CollectionSelector.css';
 
 const CollectionSelector = ({ videoId, onClose, onSuccess }) => {
@@ -29,7 +30,7 @@ const CollectionSelector = ({ videoId, onClose, onSuccess }) => {
                 setSelectedCollections(selected.map(c => c.id));
             }
         } catch (error) {
-            console.error('加载收藏夹失败:', error);
+            logger.warn('加载收藏夹失败:', error);
             setError('加载收藏夹失败');
         } finally {
             setLoading(false);
@@ -58,7 +59,7 @@ const CollectionSelector = ({ videoId, onClose, onSuccess }) => {
 
             onSuccess && onSuccess();
         } catch (error) {
-            console.error('操作失败:', error);
+            logger.warn('收藏夹操作失败:', error);
             setError('操作失败，请重试');
         }
     };
@@ -79,15 +80,14 @@ const CollectionSelector = ({ videoId, onClose, onSuccess }) => {
                 await collectionApi.removeCollection(collection.id);
                 await loadCollections();
             } catch (error) {
-                console.error('删除失败:', error);
+                logger.warn('删除收藏夹失败:', error);
                 setError('删除失败');
             }
         }
     };
 
     const handleEditCollection = (collection) => {
-        // 这里可以添加编辑功能
-        console.log('编辑收藏夹:', collection);
+        setError(`收藏夹 "${collection.name}" 暂不支持编辑`);
     };
 
     if (loading) {

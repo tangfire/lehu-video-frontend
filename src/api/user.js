@@ -1,6 +1,12 @@
 
 import request from '../utils/request';
 
+export const AUTH_CHANGED_EVENT = 'lehu:auth-changed';
+
+const emitAuthChanged = () => {
+    window.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
+};
+
 // 用户API服务
 export const userApi = {
     // 获取验证码
@@ -99,6 +105,7 @@ export const saveUserData = (token, userInfo) => {
     };
 
     localStorage.setItem('userInfo', JSON.stringify(userData));
+    emitAuthChanged();
     return userData;
 };
 
@@ -109,8 +116,7 @@ export const getCurrentUser = () => {
     try {
         const userInfo = localStorage.getItem('userInfo');
         return userInfo ? JSON.parse(userInfo) : null;
-    } catch (error) {
-        console.error('获取用户信息失败:', error);
+    } catch {
         return null;
     }
 };
@@ -137,6 +143,7 @@ export const clearUserData = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('userInfo');
     localStorage.removeItem('refresh_token');
+    emitAuthChanged();
 };
 
 // 更新本地存储的用户信息
@@ -150,6 +157,7 @@ export const updateLocalUserInfo = (newUserInfo) => {
             id: currentUser.id
         };
         localStorage.setItem('userInfo', JSON.stringify(updatedUser));
+        emitAuthChanged();
         return updatedUser;
     }
     return null;

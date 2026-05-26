@@ -62,6 +62,10 @@ export const ensureInt64Fields = (data) => {
     return result;
 };
 
+const firstValue = (...values) => values.find(value => value !== undefined && value !== null && value !== '');
+
+export const FALLBACK_COVER = '/default-cover.svg';
+
 /**
  * 格式化视频数据
  */
@@ -79,21 +83,23 @@ export const formatVideoData = (videoData) => {
         author: videoData.author?.name || '用户',
         authorId: authorId,
         avatar: videoData.author?.avatar || '/default-avatar.png',
-        views: videoData.playCount || videoData.views || 0,
-        likes: videoData.favoriteCount || videoData.likes || 0,
+        views: firstValue(videoData.view_count, videoData.viewCount, videoData.playCount, videoData.views, 0),
+        likes: firstValue(videoData.favoriteCount, videoData.favorite_count, videoData.likes, 0),
         dislikes: videoData.dislikeCount || videoData.dislikes || 0,
-        comments: videoData.commentCount || videoData.comments || 0,
+        comments: firstValue(videoData.commentCount, videoData.comment_count, videoData.comments, 0),
         shares: videoData.shareCount || videoData.shares || 0,
-        videoUrl: videoData.play_url || videoData.videoUrl || '',
-        thumbnail: videoData.cover_url || videoData.thumbnail || '',
-        uploadTime: formatRelativeTime(videoData.created_at || videoData.uploadTime),
+        videoUrl: firstValue(videoData.play_url, videoData.playUrl, videoData.videoUrl, ''),
+        thumbnail: firstValue(videoData.cover_url, videoData.coverUrl, videoData.thumbnail, FALLBACK_COVER),
+        uploadTime: formatRelativeTime(firstValue(videoData.upload_time, videoData.uploadTime, videoData.created_at)),
         tags: videoData.tags || [],
         isFavorite: videoData.isFavorite || false,
         isDisliked: videoData.isDisliked || false,
         isFollowing: videoData.author?.isFollowing || false,
-        play_url: videoData.play_url || videoData.videoUrl || '',
-        collectedCount: videoData.collectedCount || 0,
-        isCollected: videoData.isCollected || false
+        play_url: firstValue(videoData.play_url, videoData.playUrl, videoData.videoUrl, ''),
+        cover_url: firstValue(videoData.cover_url, videoData.coverUrl, videoData.thumbnail, FALLBACK_COVER),
+        collectedCount: firstValue(videoData.collectedCount, videoData.collected_count, 0),
+        isCollected: videoData.isCollected || false,
+        rawUploadTime: firstValue(videoData.upload_time, videoData.uploadTime, videoData.created_at, '')
     };
 };
 
@@ -140,16 +146,21 @@ export const formatRelativeTime = (date) => {
 
     try {
         const now = new Date();
-        const targetDate = new Date(date);
+        const normalizedDate = typeof date === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(date)
+            ? date.replace(' ', 'T')
+            : date;
+        const targetDate = new Date(normalizedDate);
+        if (Number.isNaN(targetDate.getTime())) return date;
         const diffInSeconds = Math.floor((now - targetDate) / 1000);
 
+        if (diffInSeconds < 0) return '刚刚';
         if (diffInSeconds < 60) return '刚刚';
         if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}分钟前`;
         if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}小时前`;
         if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 86400)}天前`;
         if (diffInSeconds < 31536000) return `${Math.floor(diffInSeconds / 2592000)}个月前`;
         return `${Math.floor(diffInSeconds / 31536000)}年前`;
-    } catch (error) {
+    } catch {
         return date;
     }
 };

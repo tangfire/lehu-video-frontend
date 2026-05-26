@@ -6,7 +6,7 @@
  * 处理点赞操作
  */
 export const handleLikeOperation = (currentState, isUndo = false) => {
-    const { isLiked, isDisliked, likeCount = 0, dislikeCount = 0 } = currentState;
+    const { isDisliked, likeCount = 0, dislikeCount = 0 } = currentState;
 
     if (isUndo) {
         return {
@@ -34,7 +34,7 @@ export const handleLikeOperation = (currentState, isUndo = false) => {
  * 处理点踩操作
  */
 export const handleDislikeOperation = (currentState, isUndo = false) => {
-    const { isLiked, isDisliked, likeCount = 0, dislikeCount = 0 } = currentState;
+    const { isLiked, likeCount = 0, dislikeCount = 0 } = currentState;
 
     if (isUndo) {
         return {

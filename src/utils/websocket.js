@@ -1,4 +1,6 @@
 // websocket.js
+import { logger } from './logger';
+
 class WebSocketManager {
     constructor() {
         this.ws = null;
@@ -13,19 +15,16 @@ class WebSocketManager {
 
     connect(token) {
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            console.warn('已有 WebSocket 连接，跳过');
             return;
         }
 
         this.currentToken = token;
         const wsBase = import.meta.env.VITE_WS_URL || `ws://${window.location.host}`;
         const url = `${wsBase}?token=${encodeURIComponent(token)}`;
-        console.log('连接 WebSocket:', url);
 
         this.ws = new WebSocket(url);
 
         this.ws.onopen = () => {
-            console.log('WebSocket连接成功');
             this.reconnectAttempts = 0;
             this.emit('connection_established');
             this.emit('connection_status', 'connected');
@@ -39,15 +38,13 @@ class WebSocketManager {
         this.ws.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data);
-                console.log('收到WebSocket消息:', data);
                 this.handleIncomingMessage(data);
             } catch (error) {
-                console.error('解析消息失败:', error);
+                logger.warn('解析消息失败:', error);
             }
         };
 
         this.ws.onclose = (event) => {
-            console.log('WebSocket断开连接:', event.code, event.reason);
             this.stopHeartbeat();
             this.stopConnectionCheck();
 
@@ -55,14 +52,12 @@ class WebSocketManager {
 
             // 正常关闭（1000）或被新连接替换，不重连
             if (event.code === 1000 || event.reason === 'replaced by new connection') {
-                console.warn('连接正常关闭或被新会话替换，停止自动重连');
                 return;
             }
 
             // 认证失败（token无效）—— 停止重连，建议跳转登录
             if (event.code === 1008 ||
                 (event.reason && (event.reason.includes('auth') || event.reason.includes('token')))) {
-                console.error('认证失败，停止重连，请重新登录');
                 // 可以在这里触发全局登出（如清除token、跳转登录页）
                 // 但为避免循环，仅打印错误
                 return;
@@ -71,7 +66,6 @@ class WebSocketManager {
             // 非正常关闭，尝试重连
             if (this.reconnectAttempts < this.maxReconnectAttempts) {
                 const backoffDelay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 10000);
-                console.log(`尝试重连 (${this.reconnectAttempts + 1}/${this.maxReconnectAttempts})，延迟 ${backoffDelay}ms`);
                 setTimeout(() => {
                     this.reconnectAttempts++;
                     if (this.currentToken) {
@@ -79,12 +73,12 @@ class WebSocketManager {
                     }
                 }, backoffDelay);
             } else {
-                console.error('达到最大重连次数，停止重连');
+                logger.warn('达到最大重连次数，停止重连');
             }
         };
 
         this.ws.onerror = (error) => {
-            console.error('WebSocket连接错误:', error);
+            logger.warn('WebSocket连接错误:', error);
             this.emit('connection_error', error);
             this.emit('connection_status', 'error');
         };
@@ -112,7 +106,6 @@ class WebSocketManager {
         this.connectionCheckInterval = setInterval(() => {
             if (this.isConnected()) {
                 if (this.lastHeartbeatTime && Date.now() - this.lastHeartbeatTime > 60000) {
-                    console.warn('心跳超时，重新连接...');
                     this.reconnect();
                 }
             }
@@ -135,16 +128,14 @@ class WebSocketManager {
 
     send(data) {
         if (!this.isConnected()) {
-            console.error('WebSocket未连接');
             return false;
         }
         try {
             const message = typeof data === 'string' ? data : JSON.stringify(data);
             this.ws.send(message);
-            console.log('发送WebSocket消息:', data);
             return true;
         } catch (error) {
-            console.error('发送消息失败:', error);
+            logger.warn('发送消息失败:', error);
             return false;
         }
     }
@@ -263,7 +254,6 @@ class WebSocketManager {
                 });
                 break;
             case 'pong':
-                console.log('收到心跳响应');
                 this.lastHeartbeatTime = Date.now();
                 break;
             case 'auth_success':
@@ -276,7 +266,7 @@ class WebSocketManager {
                 this.emit('notification', rest.data || rest);
                 break;
             default:
-                console.log('收到未知类型的消息:', action, rest);
+                logger.debug('收到未知类型的消息:', action, rest);
                 this.emit(action, rest);
         }
     }
@@ -322,13 +312,12 @@ class WebSocketManager {
     }
 
     emit(event, data) {
-        console.log(`🔥 WebSocket emit: ${event}`, data);
         if (this.listeners.has(event)) {
             this.listeners.get(event).forEach(callback => {
                 try {
                     callback(data);
                 } catch (error) {
-                    console.error(`Error in ${event} listener:`, error);
+                    logger.warn(`Error in ${event} listener:`, error);
                 }
             });
         }

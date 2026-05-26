@@ -1,6 +1,6 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
-import { getCurrentUser, clearUserData, getUserDisplayName } from '../../api/user';
+import { getCurrentUser, clearUserData, getUserDisplayName, AUTH_CHANGED_EVENT } from '../../api/user';
 import {
     FiSearch,
     FiUpload,
@@ -9,7 +9,6 @@ import {
     FiSettings,
     FiLogOut,
     FiMessageCircle,
-    FiBell,
     FiMenu,
     FiX,
     FiUsers,
@@ -26,7 +25,6 @@ const Header = () => {
     const [showDropdown, setShowDropdown] = useState(false);
     const [showMobileMenu, setShowMobileMenu] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
-    const [messageUnreadCount, setMessageUnreadCount] = useState(0);
     const navigate = useNavigate();
     const location = useLocation();
     const [showMobileSearch, setShowMobileSearch] = useState(false);
@@ -43,21 +41,19 @@ const Header = () => {
             if (token && user) {
                 setIsLoggedIn(true);
                 setUserInfo(user);
-
-                // 模拟获取未读消息数（实际应该从API获取）
-                // 这里可以调用 messageApi.getUnreadCount()
-                // 暂时使用模拟数据
-                setMessageUnreadCount(Math.floor(Math.random() * 10));
             } else {
                 setIsLoggedIn(false);
                 setUserInfo(null);
-                setMessageUnreadCount(0);
             }
         };
 
         checkAuth();
         window.addEventListener('storage', checkAuth);
-        return () => window.removeEventListener('storage', checkAuth);
+        window.addEventListener(AUTH_CHANGED_EVENT, checkAuth);
+        return () => {
+            window.removeEventListener('storage', checkAuth);
+            window.removeEventListener(AUTH_CHANGED_EVENT, checkAuth);
+        };
     }, []);
 
     const handleLogout = () => {
@@ -155,10 +151,6 @@ const Header = () => {
                         >
                             <FiMessageCircle/>
                             <span>消息</span>
-                            {messageUnreadCount > 0 && (
-                                <span
-                                    className="notification-badge">{messageUnreadCount > 99 ? '99+' : messageUnreadCount}</span>
-                            )}
                         </Link>
                     )}
 
@@ -172,11 +164,6 @@ const Header = () => {
                                 <FiUpload/>
                                 <span>上传</span>
                             </Link>
-
-                            <button className="nav-link notification-btn">
-                                <FiBell/>
-                                <span className="notification-badge">3</span>
-                            </button>
 
                             <div className="user-menu" ref={dropdownRef}>
                                 <button

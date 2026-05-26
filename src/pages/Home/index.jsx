@@ -1,11 +1,18 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import VideoCard from '../../components/Common/VideoCard';
-import { FiTrendingUp, FiHeart, FiMapPin } from 'react-icons/fi';
+import { FiTrendingUp, FiHeart, FiRefreshCw, FiUpload } from 'react-icons/fi';
 import { IoSparkles } from 'react-icons/io5';
 import { videoApi } from '../../api/video';
 import { getCurrentUser } from '../../api/user';
+import { formatVideoData } from '../../utils/dataFormat';
 import './Home.css';
+
+const FEED_TYPES = {
+    following: 0,
+    recommend: 1,
+    hot: 2
+};
 
 const Home = () => {
     const [videos, setVideos] = useState([]);
@@ -14,9 +21,12 @@ const Home = () => {
     const [hasMore, setHasMore] = useState(true);
     const [nextTime, setNextTime] = useState(Math.floor(Date.now() / 1000));
     const [error, setError] = useState(null);
-    const navigate = useNavigate();
 
-    const fetchVideos = async (latestTime = nextTime, isLoadMore = false) => {
+    const fetchVideos = async ({
+        latestTime = Math.floor(Date.now() / 1000),
+        isLoadMore = false,
+        tab = activeTab
+    } = {}) => {
         try {
             setLoading(true);
             setError(null);
@@ -26,33 +36,14 @@ const Home = () => {
             const response = await videoApi.feedShortVideo({
                 latest_time: latestTime,
                 user_id: user?.id || "0",
-                feed_num: 10
+                feed_num: 10,
+                feed_type: FEED_TYPES[tab] ?? FEED_TYPES.recommend
             });
 
-            console.log('视频流响应:', response);
-
             if (response && response.videos) {
-                const mappedVideos = response.videos.map(video => ({
-                    id: video.id,
-                    title: video.title,
-                    author: video.author?.name || '未知用户',
-                    authorId: video.author?.id,
-                    avatar: video.author?.avatar || '/default-avatar.png',
-                    views: video.views || Math.floor(Math.random() * 10000) + 1000,
-                    likes: video.favoriteCount || 0,
-                    comments: video.commentCount || 0,
-                    thumbnail: video.cover_url || 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4',
-                    duration: '2:30',
-                    uploadTime: '刚刚',
-                    tags: [],
-                    play_url: video.play_url,
-                    cover_url: video.cover_url,
-                    isFavorite: video.isFavorite || false,
-                    isCollected: video.isCollected || false,
-                    collectedCount: video.collectedCount || 0
-                }));
-
-                console.log('处理后的视频数据:', mappedVideos);
+                const mappedVideos = response.videos
+                    .map(formatVideoData)
+                    .filter(Boolean);
 
                 if (isLoadMore) {
                     setVideos(prev => [...prev, ...mappedVideos]);
@@ -68,72 +59,42 @@ const Home = () => {
 
                 setHasMore(response.videos.length >= 10);
             } else {
-                console.warn('视频数据格式异常:', response);
+                if (!isLoadMore) setVideos([]);
                 setHasMore(false);
             }
         } catch (error) {
-            console.error('获取视频失败:', error);
             setError(`获取视频失败: ${error.message || '未知错误'}`);
-
-            if (!isLoadMore) {
-                loadMockData();
-            }
+            if (!isLoadMore) setVideos([]);
+            setHasMore(false);
         } finally {
             setLoading(false);
         }
     };
 
-    const loadMockData = () => {
-        const mockVideos = [
-            {
-                id: 1,
-                title: '演示视频：美丽的风景',
-                author: '系统演示',
-                authorId: 1,
-                avatar: './default-avatar.png',
-                views: '12500',
-                likes: '1200',
-                comments: 342,
-                thumbnail: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80',
-                duration: '2:45',
-                uploadTime: '2小时前',
-                tags: ['演示', '风景']
-            },
-            {
-                id: 2,
-                title: '演示视频：美食制作',
-                author: '系统演示',
-                authorId: 1,
-                avatar: './default-avatar.png',
-                views: '8700',
-                likes: '900',
-                comments: 123,
-                thumbnail: 'https://images.unsplash.com/photo-1565958011703-44f9829ba187?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80',
-                duration: '4:20',
-                uploadTime: '5小时前',
-                tags: ['演示', '美食']
-            }
-        ];
-
-        setVideos(mockVideos);
-        setHasMore(false);
-    };
-
     useEffect(() => {
-        fetchVideos();
-    }, []);
+        const freshTime = Math.floor(Date.now() / 1000);
+        setNextTime(freshTime);
+        setVideos([]);
+        setHasMore(true);
+        fetchVideos({ latestTime: freshTime, tab: activeTab });
+    }, [activeTab]);
 
     const tabs = [
         { key: 'recommend', label: '推荐', icon: <IoSparkles /> },
         { key: 'following', label: '关注', icon: <FiHeart /> },
-        { key: 'hot', label: '热门', icon: <FiTrendingUp /> },
-        { key: 'nearby', label: '附近', icon: <FiMapPin /> }
+        { key: 'hot', label: '热门', icon: <FiTrendingUp /> }
     ];
 
     const handleLoadMore = () => {
         if (!loading && hasMore) {
-            fetchVideos(nextTime, true);
+            fetchVideos({ latestTime: nextTime, isLoadMore: true });
         }
+    };
+
+    const handleRefresh = () => {
+        const freshTime = Math.floor(Date.now() / 1000);
+        setNextTime(freshTime);
+        fetchVideos({ latestTime: freshTime, tab: activeTab });
     };
 
     if (loading && videos.length === 0) {
@@ -160,40 +121,40 @@ const Home = () => {
                             onClick={() => setActiveTab(tab.key)}
                         >
                             <span className="tab-icon">{tab.icon}</span>
-                            {tab.label}
+                            <span className="tab-text">{tab.label}</span>
                         </button>
                     ))}
                 </div>
             </div>
 
             <main className="home-content">
+                <div className="feed-toolbar">
+                    <div>
+                        <h1>视频流</h1>
+                        <p>{tabs.find(tab => tab.key === activeTab)?.label || '推荐'}内容</p>
+                    </div>
+                    <div className="feed-actions">
+                        <button className="icon-action" onClick={handleRefresh} disabled={loading} title="刷新">
+                            <FiRefreshCw />
+                            <span>刷新</span>
+                        </button>
+                        <Link className="publish-action" to="/upload">
+                            <FiUpload />
+                            <span>发布</span>
+                        </Link>
+                    </div>
+                </div>
+
                 {error && (
                     <div className="error-banner">
                         <div className="error-content">
                             <p>{error}</p>
-                            <button onClick={() => fetchVideos()} className="retry-btn">
+                            <button onClick={handleRefresh} className="retry-btn">
                                 重试
                             </button>
                         </div>
                     </div>
                 )}
-
-                <div className="welcome-banner">
-                    <div className="banner-content">
-                        <h2>发现今日精彩</h2>
-                        <p>探索来自全球创作者的优质短视频内容</p>
-                    </div>
-                    <div className="banner-stats">
-                        <div className="stat">
-                            <span className="number">{videos.length}</span>
-                            <span className="label">推荐视频</span>
-                        </div>
-                        <div className="stat">
-                            <span className="number">0</span>
-                            <span className="label">今日观看</span>
-                        </div>
-                    </div>
-                </div>
 
                 {videos.length > 0 ? (
                     <div className="video-feed">
@@ -203,10 +164,10 @@ const Home = () => {
                     </div>
                 ) : (
                     <div className="empty-videos">
-                        <div className="empty-icon">📹</div>
+                        <FiUpload className="empty-icon" />
                         <h3>暂无视频内容</h3>
-                        <p>暂时没有找到视频，请稍后再试</p>
-                        <button onClick={() => fetchVideos()} className="retry-btn">
+                        <p>{error ? '接口暂时不可用，修复后刷新即可看到内容' : '这个分类还没有视频，可以先发布一个'}</p>
+                        <button onClick={handleRefresh} className="retry-btn">
                             刷新
                         </button>
                     </div>

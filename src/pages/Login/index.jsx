@@ -56,16 +56,11 @@ const Login = () => {
                 requestData.email = formData.account;
             }
 
-            console.log('登录请求数据:', requestData);
-
             // 调用登录API
             const response = await userApi.login(requestData);
-            console.log('登录响应:', response); // response现在直接是data字段的内容
 
             // response现在是: { token: "...", user: {...} }
             if (response.token && response.user) {
-                console.log('登录成功，用户ID:', response.user.id);
-
                 // 保存token和完整的用户信息
                 saveUserData(response.token, response.user);
 
@@ -75,7 +70,6 @@ const Login = () => {
                 setError('登录失败，服务器返回数据不完整');
             }
         } catch (error) {
-            console.error('登录失败:', error);
             setError(error.message || '登录失败，请检查账号和密码');
         } finally {
             setLoading(false);
@@ -126,9 +120,6 @@ const Login = () => {
                         <label className="remember-me">
                             <input type="checkbox" disabled={loading} /> 记住我
                         </label>
-                        <Link to="/forgot-password" className="forgot-password">
-                            忘记密码？
-                        </Link>
                     </div>
 
                     <button
@@ -144,13 +135,6 @@ const Login = () => {
                     <p>
                         还没有账号？ <Link to="/register">立即注册</Link>
                     </p>
-                    <div className="divider">
-                        <span>或使用以下方式登录</span>
-                    </div>
-                    <div className="social-login">
-                        <button className="social-btn wechat" disabled={loading}>微信</button>
-                        <button className="social-btn qq" disabled={loading}>QQ</button>
-                    </div>
                 </div>
             </div>
         </div>

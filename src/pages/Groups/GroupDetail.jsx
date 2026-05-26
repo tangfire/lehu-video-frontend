@@ -277,7 +277,6 @@ const GroupDetail = () => {
 
                         <div className="members-list">
                             {members.map(member => {
-                                const isOnline = onlineStatus[member.id] === 1;
                                 const statusColor = getOnlineStatusColor(onlineStatus[member.id]);
                                 return (
                                     <div key={member.id} className="member-item">

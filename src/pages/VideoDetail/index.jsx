@@ -6,8 +6,9 @@ import { getCurrentUser } from '../../api/user';
 import CommentList from '../../components/Comment/CommentList';
 import CommentInput from '../../components/Comment/CommentInput';
 import FollowButton from '../../components/Follow/FollowButton';
-import { collectionApi } from '../../api/collection';
 import CollectionSelector from '../../components/Collection/CollectionSelector';
+import { formatVideoData, FALLBACK_COVER } from '../../utils/dataFormat';
+import { FiAlertCircle, FiBookmark, FiEye, FiHeart, FiMessageCircle, FiSend, FiThumbsDown } from 'react-icons/fi';
 import './VideoDetail.css';
 
 const DEFAULT_AVATAR = '/default-avatar.png';
@@ -17,7 +18,7 @@ const LikeErrorToast = ({ error, onClose }) => {
     return (
         <div className="like-error-toast" onClick={onClose}>
             <div className="like-error-content">
-                <span className="like-error-icon">⚠️</span>
+                <FiAlertCircle className="like-error-icon" />
                 <span className="like-error-text">{error}</span>
             </div>
         </div>
@@ -38,7 +39,7 @@ const VideoDetail = () => {
     const [newCommentAdded, setNewCommentAdded] = useState(0);
     const [isLiking, setIsLiking] = useState(false);
     const [isDisliking, setIsDisliking] = useState(false);
-    const [isCollecting, setIsCollecting] = useState(false);
+    const [isCollecting] = useState(false);
     const [showCollectionSelector, setShowCollectionSelector] = useState(false);
     const [isCollected, setIsCollected] = useState(false);
     const [collectionCount, setCollectionCount] = useState(0);
@@ -70,30 +71,7 @@ const VideoDetail = () => {
             const response = await videoApi.getVideoById(id);
             if (response && response.video) {
                 const videoData = response.video;
-                const formattedVideo = {
-                    id: videoData.id,
-                    title: videoData.title,
-                    description: videoData.description || '',
-                    author: videoData.author?.name || '用户',
-                    authorId: videoData.author?.id,
-                    avatar: videoData.author?.avatar || DEFAULT_AVATAR,
-                    views: videoData.viewCount || Math.floor(Math.random() * 10000) + 1000,
-                    likes: videoData.favoriteCount || 0,
-                    dislikes: 0,
-                    comments: videoData.commentCount || 0,
-                    shares: 0,
-                    videoUrl: videoData.play_url,
-                    thumbnail: videoData.cover_url,
-                    uploadTime: '刚刚',
-                    tags: [],
-                    isFavorite: videoData.isFavorite || false,
-                    isDisliked: false,
-                    isFollowing: videoData.author?.isFollowing || false,
-                    isCollected: videoData.isCollected || false,
-                    collectedCount: videoData.collectedCount || 0,
-                    play_url: videoData.play_url,
-                    cover_url: videoData.cover_url
-                };
+                const formattedVideo = formatVideoData(videoData);
                 setVideo(formattedVideo);
                 setIsCollected(formattedVideo.isCollected || false);
                 setCollectionCount(formattedVideo.collectedCount || 0);
@@ -102,12 +80,9 @@ const VideoDetail = () => {
                 setIsFollowing(formattedVideo.isFollowing || false);
             } else {
                 setError('视频不存在或已删除');
-                loadMockVideo();
             }
         } catch (error) {
-            console.error('获取视频详情失败:', error);
             setError(`获取视频失败: ${error.message || '未知错误'}`);
-            loadMockVideo();
         } finally {
             setLoading(false);
         }
@@ -131,36 +106,9 @@ const VideoDetail = () => {
             setIsLiked(res.is_favorite && res.favorite_type === 0);
             setIsDisliked(res.is_favorite && res.favorite_type === 1);
         } catch (error) {
-            console.warn('获取点赞状态失败:', error);
+            setLikeError(error.message || '互动状态同步失败');
+            setTimeout(() => setLikeError(null), 3000);
         }
-    };
-
-    const loadMockVideo = () => {
-        const mockVideo = {
-            id: id || "1",
-            title: '演示视频：美丽的风景',
-            description: '这是一个演示视频，展示了美丽的风景。实际视频数据将从服务器获取。',
-            author: '系统演示',
-            authorId: 1,
-            avatar: DEFAULT_AVATAR,
-            views: '12500',
-            likes: '1200',
-            dislikes: '50',
-            comments: 342,
-            shares: 89,
-            videoUrl: 'https://example.com/video.mp4',
-            thumbnail: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80',
-            uploadTime: '2小时前',
-            tags: ['演示', '风景', '自然'],
-            isFavorite: false,
-            isDisliked: false,
-            isFollowing: false,
-            play_url: ''
-        };
-        setVideo(mockVideo);
-        setIsLiked(false);
-        setIsDisliked(false);
-        setIsFollowing(false);
     };
 
     const handleLike = useCallback(async () => {
@@ -191,7 +139,6 @@ const VideoDetail = () => {
                 setIsDisliked(false);
             }
         } catch (error) {
-            console.error('点赞操作失败:', error);
             setLikeError(error.message || '操作失败，请稍后重试');
         } finally {
             setIsLiking(false);
@@ -226,7 +173,6 @@ const VideoDetail = () => {
                 setIsLiked(false);
             }
         } catch (error) {
-            console.error('点踩操作失败:', error);
             setLikeError(error.message || '操作失败，请稍后重试');
         } finally {
             setIsDisliking(false);
@@ -237,7 +183,7 @@ const VideoDetail = () => {
         setVideo(prev => ({ ...prev, isFollowing }));
     };
 
-    const handleCommentSubmit = (newComment) => {
+    const handleCommentSubmit = () => {
         if (video) {
             setVideo(prev => ({ ...prev, comments: (prev.comments || 0) + 1 }));
         }
@@ -305,7 +251,6 @@ const VideoDetail = () => {
                 </div>
             )}
             <button className="back-button" onClick={() => navigate(-1)}>← 返回</button>
-            {error && <div className="video-error-banner"><p>{error}（显示模拟数据）</p></div>}
 
             <div className="video-detail-content">
                 <div className="video-player-section">
@@ -314,13 +259,13 @@ const VideoDetail = () => {
                             <video
                                 controls
                                 className="video-player-element"
-                                poster={video.thumbnail || video.cover_url}
+                                poster={video.thumbnail || video.cover_url || FALLBACK_COVER}
                                 src={video.play_url || video.videoUrl}
                             >您的浏览器不支持视频播放</video>
                         ) : (
                             <div className="video-placeholder">
-                                <img src={video.thumbnail || video.cover_url} alt={video.title} />
-                                <div className="play-button">▶</div>
+                                <img src={video.thumbnail || video.cover_url || FALLBACK_COVER} alt={video.title} />
+                                <div className="play-button">播放</div>
                             </div>
                         )}
                     </div>
@@ -328,7 +273,7 @@ const VideoDetail = () => {
                     <div className="video-info">
                         <h1 className="video-title">{video.title}</h1>
                         <div className="video-meta-info">
-                            <span className="views-count">👁️ {video.views || 0} 观看</span>
+                            <span className="views-count"><FiEye /> {video.views || 0} 观看</span>
                             <span className="upload-time">发布于 {video.uploadTime || '刚刚'}</span>
                         </div>
                         {video.description && <div className="video-description"><p>{video.description}</p></div>}
@@ -390,7 +335,7 @@ const VideoDetail = () => {
                             onClick={handleLike}
                             disabled={isLiking || isDisliking}
                         >
-                            <span className="icon">{isLiked ? '❤️' : '🤍'}</span>
+                            <span className="icon"><FiHeart /></span>
                             <span className="count">{video.likes || 0}</span>
                             {isLiking && <span className="loading-dot">...</span>}
                         </button>
@@ -400,18 +345,18 @@ const VideoDetail = () => {
                             onClick={handleDislike}
                             disabled={isDisliking || isLiking}
                         >
-                            <span className="icon">{isDisliked ? '👎🏼' : '👎'}</span>
+                            <span className="icon"><FiThumbsDown /></span>
                             <span className="count">{video.dislikes || 0}</span>
                             {isDisliking && <span className="loading-dot">...</span>}
                         </button>
 
                         <button className="interaction-btn comment-btn">
-                            <span className="icon">💬</span>
+                            <span className="icon"><FiMessageCircle /></span>
                             <span className="count">{video.comments || 0}</span>
                         </button>
 
                         <button className="interaction-btn share-btn">
-                            <span className="icon">↪️</span>
+                            <span className="icon"><FiSend /></span>
                             <span className="count">{video.shares || 0}</span>
                         </button>
 
@@ -420,7 +365,7 @@ const VideoDetail = () => {
                             onClick={handleCollect}
                             disabled={isCollecting}
                         >
-                            <span className="icon">{isCollected ? '⭐️' : '⭐'}</span>
+                            <span className="icon"><FiBookmark /></span>
                             <span className="count">{collectionCount}</span>
                             {isCollecting && <span className="loading-dot">...</span>}
                         </button>

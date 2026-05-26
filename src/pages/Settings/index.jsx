@@ -4,7 +4,6 @@ import './Settings.css';
 
 const Settings = () => {
     const [activeTab, setActiveTab] = useState('profile');
-    const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState({ type: '', text: '' });
     const [currentUser, setCurrentUser] = useState(null);
@@ -108,7 +107,6 @@ const Settings = () => {
         }
 
         try {
-            setLoading(true);
             setMessage({ type: '', text: '' });
 
             // 这里应该调用文件上传接口
@@ -127,8 +125,6 @@ const Settings = () => {
         } catch (error) {
             console.error('上传头像失败:', error);
             setMessage({ type: 'error', text: '上传头像失败' });
-        } finally {
-            setLoading(false);
         }
     };
 
@@ -148,7 +144,6 @@ const Settings = () => {
         }
 
         try {
-            setLoading(true);
             const reader = new FileReader();
             reader.onload = (event) => {
                 const imageUrl = event.target.result;
@@ -159,8 +154,6 @@ const Settings = () => {
         } catch (error) {
             console.error('上传背景图失败:', error);
             setMessage({ type: 'error', text: '上传背景图失败' });
-        } finally {
-            setLoading(false);
         }
     };
 

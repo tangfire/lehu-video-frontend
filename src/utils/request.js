@@ -4,7 +4,7 @@ import { clearUserData } from '../api/user';
 
 // 创建axios实例
 const request = axios.create({
-    baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/v1',
+    baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:18080/v1',
     timeout: 30000,
     headers: {
         'Content-Type': 'application/json'
@@ -48,6 +48,18 @@ const generateRequestKey = (config) => {
     return `${method}_${url}_${dataStr}_${paramsStr}`;
 };
 
+const cleanupRequest = (config) => {
+    const requestKey = config?.metadata?.requestKey;
+    if (!requestKey) return;
+
+    pendingRequests.delete(requestKey);
+    const timer = requestTimers.get(requestKey);
+    if (timer) {
+        clearTimeout(timer);
+        requestTimers.delete(requestKey);
+    }
+};
+
 // 请求拦截器
 request.interceptors.request.use(
     (config) => {
@@ -76,11 +88,14 @@ request.interceptors.request.use(
         const isVideoFeed = url.includes('/video/feed');
 
         if (!isChatRequest && !isVideoFeed && pendingRequests.has(requestKey)) {
-            console.log('🔄 取消重复请求:', requestKey);
             return Promise.reject(new Error('重复请求已取消'));
         }
 
         // 添加请求标记（对于聊天请求，使用不同的key避免冲突）
+        config.metadata = {
+            ...(config.metadata || {}),
+            requestKey
+        };
         pendingRequests.set(requestKey, true);
 
         // 30秒后自动清理
@@ -94,7 +109,6 @@ request.interceptors.request.use(
         return config;
     },
     (error) => {
-        console.error('请求拦截器错误:', error);
         return Promise.reject(error);
     }
 );
@@ -105,13 +119,7 @@ request.interceptors.response.use(
         const { data: responseData } = response;
 
         // 清理请求标记
-        const requestKey = generateRequestKey(response.config);
-        pendingRequests.delete(requestKey);
-        const timer = requestTimers.get(requestKey);
-        if (timer) {
-            clearTimeout(timer);
-            requestTimers.delete(requestKey);
-        }
+        cleanupRequest(response.config);
 
         // 处理响应数据，确保ID为字符串
         const processedData = processResponseData(responseData);
@@ -131,15 +139,7 @@ request.interceptors.response.use(
         }
     },
     (error) => {
-        if (error.config) {
-            const requestKey = generateRequestKey(error.config);
-            pendingRequests.delete(requestKey);
-            const timer = requestTimers.get(requestKey);
-            if (timer) {
-                clearTimeout(timer);
-                requestTimers.delete(requestKey);
-            }
-        }
+        cleanupRequest(error.config);
 
         if (error.response?.status === 401) {
             clearUserData();

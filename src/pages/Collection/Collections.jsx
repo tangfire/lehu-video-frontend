@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { collectionApi } from '../../api/collection';
 import { formatVideoData } from '../../utils/dataFormat';
 import VideoCard from '../../components/Common/VideoCard';
@@ -11,7 +11,6 @@ import './Collections.css';
 
 const Collections = () => {
     const { userId } = useParams();
-    const navigate = useNavigate();
 
     const [collections, setCollections] = useState([]);
     const [selectedCollection, setSelectedCollection] = useState(null);

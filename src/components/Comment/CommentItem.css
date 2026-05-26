@@ -45,6 +45,21 @@
 
 .comment-body {
     flex: 1;
+    min-width: 0;
+}
+
+.comment-inline-error {
+    display: inline-flex;
+    max-width: 100%;
+    margin-bottom: 8px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    background: #fff1f0;
+    color: #c0392b;
+    border: 1px solid #ffd6d1;
+    font-size: 12px;
+    line-height: 1.4;
+    cursor: pointer;
 }
 
 .comment-header {

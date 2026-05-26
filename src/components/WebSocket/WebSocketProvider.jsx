@@ -1,7 +1,8 @@
 // WebSocketProvider.jsx
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { webSocketAPI } from '../../api/websocket';
-import { getCurrentUser } from '../../api/user';
+import { AUTH_CHANGED_EVENT, getCurrentUser } from '../../api/user';
+import { logger } from '../../utils/logger';
 
 const WebSocketContext = createContext(null);
 
@@ -22,7 +23,7 @@ export const WebSocketProvider = ({ children }) => {
 
     // 处理新消息
     const handleNewMessage = useCallback((message) => {
-        console.log('收到新消息:', message);
+        logger.debug('收到新消息:', message);
 
         const user = getCurrentUser();
         if (user && String(message.sender_id) !== String(user.id)) {
@@ -43,8 +44,6 @@ export const WebSocketProvider = ({ children }) => {
 
     // 处理消息发送成功
     const handleMessageSent = useCallback((data) => {
-        console.log('收到发送确认:', data);
-
         const info = data.data || data;
         const serverId = info.message_id ? String(info.message_id) : null;
         const clientId = info.client_msg_id || data.client_msg_id;
@@ -74,8 +73,6 @@ export const WebSocketProvider = ({ children }) => {
 
     // 处理消息已送达
     const handleMessageDelivered = useCallback((data) => {
-        console.log('消息已送达:', data);
-
         const info = data.data || data;
         const messageId = info.message_id ? String(info.message_id) : null;
 
@@ -95,8 +92,6 @@ export const WebSocketProvider = ({ children }) => {
 
     // 处理消息已读
     const handleMessageRead = useCallback((data) => {
-        console.log('消息已读:', data);
-
         const info = data.data || data;
         const messageId = info.message_id ? String(info.message_id) : null;
 
@@ -129,8 +124,6 @@ export const WebSocketProvider = ({ children }) => {
 
     // 处理消息撤回
     const handleMessageRecalled = useCallback((data) => {
-        console.log('消息已撤回:', data);
-
         const info = data.data || data;
         const messageId = info.message_id ? String(info.message_id) : null;
 
@@ -172,12 +165,10 @@ export const WebSocketProvider = ({ children }) => {
     }, []);
 
     const handleNotification = useCallback((notification) => {
-        console.log('收到通知:', notification);
         setNotifications(prev => [notification, ...prev.slice(0, 9)]);
     }, []);
 
     const handleConnectionStatus = useCallback((status) => {
-        console.log('WebSocket连接状态更新:', status);
         setConnectionStatus(status);
     }, []);
 
@@ -186,14 +177,14 @@ export const WebSocketProvider = ({ children }) => {
         const token = localStorage.getItem('token');
 
         if (!token || !user) {
-            console.log('用户未登录，跳过WebSocket连接');
+            webSocketAPI.disconnect();
             return;
         }
 
         try {
             webSocketAPI.connect(token);
         } catch (error) {
-            console.error('WebSocket连接失败:', error);
+            logger.warn('WebSocket连接失败:', error);
         }
     }, []);
 
@@ -213,10 +204,6 @@ export const WebSocketProvider = ({ children }) => {
     }, []);
 
     useEffect(() => {
-        console.log('messageStatusUpdates 更新:', messageStatusUpdates);
-    }, [messageStatusUpdates]);
-
-    useEffect(() => {
         // 监听连接状态
         const cleanupConnectionStatus = webSocketAPI.onConnectionStatus(handleConnectionStatus);
 
@@ -230,8 +217,7 @@ export const WebSocketProvider = ({ children }) => {
         webSocketAPI.onNotification(handleNotification);
         webSocketAPI.onNotFriend(handleNotFriend);
 
-        // 初始连接
-        connectWebSocket();
+        const initTimer = window.setTimeout(connectWebSocket, 0);
 
         // 监听登录状态变化
         const handleStorageChange = (e) => {
@@ -249,8 +235,10 @@ export const WebSocketProvider = ({ children }) => {
         };
 
         window.addEventListener('storage', handleStorageChange);
+        window.addEventListener(AUTH_CHANGED_EVENT, connectWebSocket);
 
         return () => {
+            window.clearTimeout(initTimer);
             webSocketAPI.disconnect();
 
             if (cleanupConnectionStatus && typeof cleanupConnectionStatus === 'function') {
@@ -267,6 +255,7 @@ export const WebSocketProvider = ({ children }) => {
             webSocketAPI.offNotFriend(handleNotFriend);
 
             window.removeEventListener('storage', handleStorageChange);
+            window.removeEventListener(AUTH_CHANGED_EVENT, connectWebSocket);
         };
     }, [connectWebSocket, handleNewMessage, handleMessageSent, handleMessageDelivered,
         handleMessageRead, handleMessageRecalled, handleTyping, handleNotification,

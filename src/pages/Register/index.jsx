@@ -42,8 +42,8 @@ const Register = () => {
             newErrors.code = '验证码不能为空';
         }
 
-        if (formData.password.length < 6) {
-            newErrors.password = '密码至少6位';
+        if (formData.password.length < 8) {
+            newErrors.password = '密码至少8位';
         }
 
         if (formData.password !== formData.confirmPassword) {
@@ -72,19 +72,16 @@ const Register = () => {
             }
 
             const response = await userApi.getVerificationCode(requestData);
-            console.log('验证码响应:', response); // response现在直接是data字段的内容
 
             // response现在是 { code_id: 3648334586 }
             if (response.code_id) {
-                setFormData(prev => ({ ...prev, codeId: response.code_id }));
+                setFormData(prev => ({ ...prev, codeId: response.code_id, code: '888888' }));
                 setStep(2); // 切换到第二步
                 setCountdown(60); // 60秒倒计时
-                console.log('切换到第二步，codeId:', response.code_id);
             } else {
                 setErrors({ account: '获取验证码失败，请重试' });
             }
         } catch (error) {
-            console.error('获取验证码失败:', error);
             setErrors({
                 account: error.message || '获取验证码失败',
                 // 可以显示更详细的错误信息
@@ -118,30 +115,22 @@ const Register = () => {
                 requestData.email = formData.account;
             }
 
-            console.log('注册请求数据:', requestData);
-
             const response = await userApi.register(requestData);
-            console.log('注册响应:', response);
 
             // 如果注册接口也返回token和user（最佳实践）
             if (response.token && response.user) {
-                console.log('注册成功，用户ID:', response.user.id);
                 saveUserData(response.token, response.user);
                 navigate('/');
             }
             // 如果注册接口只返回user_id（向后兼容）
             else if (response.user_id) {
-                console.log('注册成功，用户ID:', response.user_id);
-
                 // 注册成功后自动登录
-                console.log('开始自动登录...');
                 const loginResponse = await userApi.login({
                     [accountType === 'mobile' ? 'mobile' : 'email']: formData.account,
                     password: formData.password
                 });
 
                 if (loginResponse.token && loginResponse.user) {
-                    console.log('登录成功，token:', loginResponse.token);
                     saveUserData(loginResponse.token, loginResponse.user);
                     navigate('/');
                 } else {
@@ -151,7 +140,6 @@ const Register = () => {
                 setErrors({ submit: '注册失败，请重试' });
             }
         } catch (error) {
-            console.error('注册失败:', error);
             setErrors({
                 submit: error.message || '注册失败，请重试',
                 ...(error.data && { details: JSON.stringify(error.data) })
@@ -160,11 +148,6 @@ const Register = () => {
             setLoading(false);
         }
     };
-
-    // 添加调试信息
-    console.log('当前步骤:', step);
-    console.log('表单数据:', formData);
-    console.log('倒计时:', countdown);
 
     return (
         <div className="register-container">
@@ -227,6 +210,7 @@ const Register = () => {
 
                         <div className="form-group">
                             <label>验证码</label>
+                            <p className="code-helper">本地开发验证码已填入 888888</p>
                             <div className="code-input-group">
                                 <input
                                     type="text"
@@ -262,7 +246,7 @@ const Register = () => {
                                     ...formData,
                                     password: e.target.value
                                 })}
-                                placeholder="至少6位密码"
+                                placeholder="至少8位密码"
                                 disabled={loading}
                             />
                             {errors.password && (

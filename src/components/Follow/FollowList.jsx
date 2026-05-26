@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { getCurrentUser } from '../../api/user';
 import {followApi} from '../../api/follow';
 import FollowButton from './FollowButton';
+import { logger } from '../../utils/logger';
 import './FollowList.css';
 
 const FollowList = ({ userId, type = 'following', showTitle = true }) => {
@@ -32,9 +33,6 @@ const FollowList = ({ userId, type = 'following', showTitle = true }) => {
                 response = await followApi.getMutualFollowList(userId, pageNum, 20);
             }
 
-            // 检查响应结构
-            console.log('关注列表响应:', response);
-
             if (response && response.users) {
                 const userList = response.users || [];
 
@@ -55,7 +53,7 @@ const FollowList = ({ userId, type = 'following', showTitle = true }) => {
                 setPage(pageNum);
             }
         } catch (error) {
-            console.error('加载关注列表失败:', error);
+            logger.warn('加载关注列表失败:', error);
         } finally {
             setLoading(false);
         }

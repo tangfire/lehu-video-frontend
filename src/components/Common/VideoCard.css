@@ -1,27 +1,28 @@
 .video-card {
     background: white;
-    border-radius: 16px;
+    border: 1px solid #eceff3;
+    border-radius: 8px;
     overflow: hidden;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-    transition: all 0.3s ease;
-    position: relative;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
 }
 
 .video-card:hover {
-    transform: translateY(-8px);
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+    transform: translateY(-3px);
+    border-color: #ffd5de;
+    box-shadow: 0 10px 30px rgba(17, 24, 39, 0.1);
 }
 
 .video-link {
-    text-decoration: none;
     color: inherit;
     display: block;
+    text-decoration: none;
 }
 
 .video-thumbnail {
     position: relative;
     width: 100%;
-    height: 200px;
+    aspect-ratio: 9 / 16;
+    background: #111827;
     overflow: hidden;
 }
 
@@ -29,145 +30,100 @@
     width: 100%;
     height: 100%;
     object-fit: cover;
-    transition: transform 0.5s ease;
+    transition: transform 0.35s ease;
 }
 
 .video-card:hover .video-thumbnail img {
-    transform: scale(1.05);
-}
-
-.video-duration {
-    position: absolute;
-    bottom: 10px;
-    right: 10px;
-    background: rgba(0, 0, 0, 0.75);
-    color: white;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 12px;
-    font-weight: 500;
+    transform: scale(1.04);
 }
 
 .video-overlay {
     position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 50%;
-    background: linear-gradient(to top, rgba(0, 0, 0, 0.3), transparent);
+    inset: auto 0 0;
+    height: 40%;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.5), transparent);
 }
 
 .video-content {
-    padding: 18px;
+    padding: 12px;
 }
 
 .video-author {
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin-bottom: 12px;
+    gap: 8px;
+    margin-bottom: 9px;
+    min-width: 0;
 }
 
 .author-avatar {
-    width: 32px;
-    height: 32px;
+    width: 28px;
+    height: 28px;
     border-radius: 50%;
     object-fit: cover;
-    border: 2px solid rgba(102, 126, 234, 0.1);
+    background: #f2f4f7;
+    flex: 0 0 auto;
 }
 
 .author-name {
-    font-size: 14px;
+    color: #475467;
+    font-size: 13px;
     font-weight: 600;
-    color: #333;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .video-title {
-    font-size: 16px;
-    font-weight: 600;
-    line-height: 1.4;
-    color: #222;
-    margin-bottom: 10px;
+    color: #111827;
     display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1.35;
+    margin: 0 0 10px;
+    min-height: 40px;
     overflow: hidden;
-}
-
-.video-tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-bottom: 12px;
-}
-
-.tag {
-    font-size: 11px;
-    padding: 4px 8px;
-    background: rgba(102, 126, 234, 0.1);
-    color: #667eea;
-    border-radius: 20px;
-    font-weight: 500;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
 }
 
 .video-stats {
     display: flex;
-    gap: 15px;
+    align-items: center;
+    gap: 10px;
+    color: #667085;
     margin-bottom: 8px;
 }
 
 .stat {
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: 4px;
+    min-width: 0;
     font-size: 12px;
-    color: #666;
 }
 
 .stat svg {
+    flex: 0 0 auto;
     font-size: 14px;
 }
 
 .video-meta {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.upload-time {
+    color: #98a2b3;
     font-size: 12px;
-    color: #999;
 }
 
-/* 响应式调整 */
 @media (max-width: 768px) {
-    .video-thumbnail {
-        height: 180px;
-    }
-
     .video-content {
-        padding: 12px;
+        padding: 10px;
     }
 
     .video-title {
         font-size: 14px;
+        min-height: 38px;
     }
 
     .video-stats {
-        gap: 10px;
-    }
-}
-
-@media (max-width: 480px) {
-    .video-thumbnail {
-        height: 160px;
-    }
-
-    .video-author {
-        margin-bottom: 8px;
-    }
-
-    .video-tags {
-        display: none;
+        gap: 8px;
     }
 }

@@ -8,6 +8,7 @@ import { friendApi } from '../../api/friend';
 import { useWebSocket } from '../../components/WebSocket/WebSocketProvider';
 import { useChat } from '../../context/chatContext';
 import { getCurrentUser } from '../../api/user';
+import { logger } from '../../utils/logger';
 import './Chat.css';
 
 const ChatRoom = () => {
@@ -20,6 +21,7 @@ const ChatRoom = () => {
     const [page, setPage] = useState(1);
     const [loadingMore, setLoadingMore] = useState(false);
     const [error, setError] = useState(null);
+    const [notice, setNotice] = useState(null);
     const [showDebugInfo, setShowDebugInfo] = useState(false);
     const [targetOnline, setTargetOnline] = useState(false);
 
@@ -36,7 +38,6 @@ const ChatRoom = () => {
     const navigate = useNavigate();
     const lastFetchRef = useRef(0);
     const initializedRef = useRef(false);
-    const pendingMessagesRef = useRef(new Map());
     const onlineTimerRef = useRef(null);
 
     const {
@@ -48,8 +49,7 @@ const ChatRoom = () => {
         onMessage,
         offMessage,
         isConnected,
-        connectionStatus, // 直接从 useWebSocket 获取
-        reconnect
+        connectionStatus
     } = useWebSocket();
 
     const {
@@ -60,6 +60,11 @@ const ChatRoom = () => {
         getCachedUser,
         getCachedGroup
     } = useChat();
+
+    const showNotice = useCallback((type, text) => {
+        setNotice({ type, text });
+        window.setTimeout(() => setNotice(null), 3000);
+    }, []);
 
     // ========== 初始化会话ID ==========
     useEffect(() => {
@@ -85,7 +90,7 @@ const ChatRoom = () => {
                     throw new Error('创建会话失败');
                 }
             } catch (error) {
-                console.error('获取会话ID失败', error);
+                logger.warn('获取会话ID失败', error);
                 setError('无法获取会话信息，请重试');
             } finally {
                 setIsLoading(false);
@@ -97,7 +102,7 @@ const ChatRoom = () => {
     // 获取会话详情
     const fetchConversationDetail = useCallback(async (force = false) => {
         if (!localConversationId) {
-            console.error('没有会话ID');
+            logger.warn('没有会话ID');
             setIsLoading(false);
             return;
         }
@@ -105,27 +110,27 @@ const ChatRoom = () => {
             setIsLoading(true);
             const now = Date.now();
             if (!force && now - lastFetchRef.current < 1000) {
-                console.log('跳过重复请求');
+                logger.debug('跳过重复请求');
                 setIsLoading(false);
                 return;
             }
             lastFetchRef.current = now;
             const cached = getCachedConversation(localConversationId);
             if (cached && !force) {
-                console.log('使用缓存的会话信息');
+                logger.debug('使用缓存的会话信息');
                 setConversation(cached);
                 setIsLoading(false);
                 return;
             }
-            console.log('正在获取会话详情，conversationId:', localConversationId);
+            logger.debug('正在获取会话详情，conversationId:', localConversationId);
             const response = await messageApi.getConversationDetail(localConversationId);
-            console.log('获取到会话详情:', response);
+            logger.debug('获取到会话详情:', response);
             if (response && response.conversation) {
                 setConversation(response.conversation);
                 cacheConversation(response.conversation);
             }
         } catch (error) {
-            console.error('获取会话详情失败:', error);
+            logger.warn('获取会话详情失败:', error);
             setError('获取会话详情失败');
         } finally {
             setIsLoading(false);
@@ -136,12 +141,12 @@ const ChatRoom = () => {
     const fetchTargetInfo = useCallback(async () => {
         if (!conversation) return;
         try {
-            console.log('正在获取目标信息，conversation:', conversation);
+            logger.debug('正在获取目标信息，conversation:', conversation);
             if (conversation.type === 0) {
                 const otherMemberId = conversation.member_ids?.find(
                     memberId => String(memberId) !== String(currentUser.id)
                 );
-                console.log('找到对方用户ID:', otherMemberId);
+                logger.debug('找到对方用户ID:', otherMemberId);
                 if (!otherMemberId) {
                     setTargetInfo({
                         id: 'unknown',
@@ -152,13 +157,13 @@ const ChatRoom = () => {
                 }
                 const cachedUser = getCachedUser(otherMemberId);
                 if (cachedUser) {
-                    console.log('使用缓存的用户信息');
+                    logger.debug('使用缓存的用户信息');
                     setTargetInfo(cachedUser);
                     return;
                 }
                 try {
                     const userInfo = await userApi.getUserInfo(otherMemberId);
-                    console.log('获取到用户信息:', userInfo);
+                    logger.debug('获取到用户信息:', userInfo);
                     if (userInfo && userInfo.user) {
                         const newTargetInfo = {
                             ...userInfo.user,
@@ -170,7 +175,7 @@ const ChatRoom = () => {
                         cacheUser(newTargetInfo);
                     }
                 } catch (error) {
-                    console.error('获取用户信息失败:', error);
+                    logger.warn('获取用户信息失败:', error);
                     setTargetInfo({
                         id: String(otherMemberId),
                         name: conversation.name || `用户${otherMemberId}`,
@@ -179,7 +184,7 @@ const ChatRoom = () => {
                 }
             } else {
                 const groupId = conversation.group_id || conversation.target_id;
-                console.log('群聊ID:', groupId);
+                logger.debug('群聊ID:', groupId);
                 if (!groupId) {
                     setTargetInfo({
                         id: 'unknown',
@@ -190,13 +195,13 @@ const ChatRoom = () => {
                 }
                 const cachedGroup = getCachedGroup(groupId);
                 if (cachedGroup) {
-                    console.log('使用缓存的群组信息');
+                    logger.debug('使用缓存的群组信息');
                     setTargetInfo(cachedGroup);
                     return;
                 }
                 try {
                     const groupInfo = await groupApi.getGroupInfo(groupId);
-                    console.log('获取到群组信息:', groupInfo);
+                    logger.debug('获取到群组信息:', groupInfo);
                     if (groupInfo && groupInfo.group) {
                         const newTargetInfo = {
                             ...groupInfo.group,
@@ -208,7 +213,7 @@ const ChatRoom = () => {
                         cacheGroup(newTargetInfo);
                     }
                 } catch (error) {
-                    console.error('获取群组信息失败:', error);
+                    logger.warn('获取群组信息失败:', error);
                     setTargetInfo({
                         id: String(groupId),
                         name: conversation.name || `群组${groupId}`,
@@ -217,7 +222,7 @@ const ChatRoom = () => {
                 }
             }
         } catch (error) {
-            console.error('获取目标信息失败:', error);
+            logger.warn('获取目标信息失败:', error);
         }
     }, [conversation, currentUser, getCachedUser, getCachedGroup, cacheUser, cacheGroup, paramTargetId]);
 
@@ -229,7 +234,7 @@ const ChatRoom = () => {
                 const status = res?.onlineStatus ?? res?.online_status ?? res?.status ?? 0;
                 setTargetOnline(status === 1);
             } catch (error) {
-                console.error('获取目标在线状态失败', error);
+                logger.warn('获取目标在线状态失败', error);
             }
         }
     }, [conversation, targetInfo]);
@@ -246,11 +251,11 @@ const ChatRoom = () => {
     // 获取消息历史
     const fetchMessages = useCallback(async (pageNum = 1, referenceId = "0") => {
         if (!localConversationId) {
-            console.error('没有会话ID，无法获取消息');
+            logger.warn('没有会话ID，无法获取消息');
             return;
         }
         try {
-            console.log('正在获取消息，参数:', { localConversationId, pageNum, referenceId });
+            logger.debug('正在获取消息，参数:', { localConversationId, pageNum, referenceId });
             if (pageNum === 1) {
                 setIsLoading(true);
             } else {
@@ -261,9 +266,9 @@ const ChatRoom = () => {
                 referenceId,
                 20
             );
-            console.log('消息API响应:', response);
+            logger.debug('消息API响应:', response);
             if (!response || !response.messages) {
-                console.error('获取消息返回格式错误:', response);
+                logger.warn('获取消息返回格式错误:', response);
                 return;
             }
             const formattedMessages = (response.messages || []).map(msg => ({
@@ -274,7 +279,7 @@ const ChatRoom = () => {
                 conversation_id: String(msg.conversation_id),
                 status: msg.status || 0
             }));
-            console.log('格式化后的消息:', formattedMessages);
+            logger.debug('格式化后的消息:', formattedMessages);
             if (pageNum === 1) {
                 setMessages(formattedMessages);
             } else {
@@ -287,7 +292,7 @@ const ChatRoom = () => {
             setHasMore(response.has_more || false);
             setPage(pageNum);
         } catch (error) {
-            console.error('获取消息失败:', error);
+            logger.warn('获取消息失败:', error);
         } finally {
             setIsLoading(false);
             setLoadingMore(false);
@@ -299,7 +304,7 @@ const ChatRoom = () => {
         if (!localConversationId || initializedRef.current) return;
         initializedRef.current = true;
         if (initialConversation && initialConversation.id === localConversationId) {
-            console.log('使用传入的会话信息:', initialConversation);
+            logger.debug('使用传入的会话信息:', initialConversation);
             setConversation(initialConversation);
             cacheConversation(initialConversation);
             fetchMessages(1, "0");
@@ -319,18 +324,18 @@ const ChatRoom = () => {
             status: message.data?.status || message.status || 2,
             created_at: message.data?.created_at || message.created_at || new Date().toISOString()
         };
-        console.log('📝 格式化后的新消息:', formattedMessage);
+        logger.debug('格式化后的新消息:', formattedMessage);
         setMessages(prev => {
             const existingIds = new Set(prev.map(m => String(m.id)));
             if (existingIds.has(String(formattedMessage.id))) {
-                console.log('🔄 消息已存在，更新状态');
+                logger.debug('消息已存在，更新状态');
                 return prev.map(m =>
                     String(m.id) === String(formattedMessage.id)
                         ? { ...m, ...formattedMessage }
                         : m
                 );
             } else {
-                console.log('➕ 添加新消息到列表');
+                logger.debug('添加新消息到列表');
                 return [...prev, formattedMessage];
             }
         });
@@ -341,7 +346,7 @@ const ChatRoom = () => {
     }, [localConversationId, currentUser, wsSendReadReceipt]);
 
     const handleMessageSent = useCallback((message) => {
-        console.log('✅ 消息发送成功:', message);
+        logger.debug('消息发送成功:', message);
         const data = message.data || message;
         const tempId = data.client_msg_id;
         const serverId = data.message_id;
@@ -361,7 +366,7 @@ const ChatRoom = () => {
     }, []);
 
     const handleMessageDelivered = useCallback((message) => {
-        console.log('📨 消息已送达:', message);
+        logger.debug('消息已送达:', message);
         const data = message.data || message;
         const messageId = data.message_id;
         if (messageId) {
@@ -375,7 +380,7 @@ const ChatRoom = () => {
     }, []);
 
     const handleMessageRead = useCallback((message) => {
-        console.log('👁️ 消息已读:', message);
+        logger.debug('消息已读:', message);
         const data = message.data || message;
         const messageId = data.message_id;
         if (messageId) {
@@ -389,7 +394,7 @@ const ChatRoom = () => {
     }, []);
 
     const handleMessageRecalled = useCallback((message) => {
-        console.log('↩️ 消息撤回:', message);
+        logger.debug('消息撤回:', message);
         const data = message.data || message;
         const messageId = data.message_id;
         if (messageId) {
@@ -403,12 +408,12 @@ const ChatRoom = () => {
     }, []);
 
     const handleUserTyping = useCallback((message) => {
-        console.log('⌨️ 用户正在输入:', message);
+        logger.debug('用户正在输入:', message);
     }, []);
 
     const handleWebSocketMessage = useCallback((message) => {
         const data = message.data || message;
-        console.log('🎯 收到WebSocket新消息:', {
+        logger.debug('收到WebSocket新消息:', {
             message,
             data,
             currentConversationId: localConversationId,
@@ -424,7 +429,7 @@ const ChatRoom = () => {
             data.type === 'system' ||
             message.action === 'message_recalled';
         if (!isCurrentConversation) {
-            console.log('⏭️ 消息不属于当前会话，跳过');
+            logger.debug('消息不属于当前会话，跳过');
             return;
         }
         switch (message.action) {
@@ -448,7 +453,7 @@ const ChatRoom = () => {
                 handleUserTyping(data);
                 break;
             default:
-                console.log('未知消息类型:', message.action);
+                logger.debug('未知消息类型:', message.action);
         }
     }, [localConversationId, currentUser, paramTargetId, handleNewMessage, handleMessageSent,
         handleMessageDelivered, handleMessageRead, handleMessageRecalled, handleUserTyping]);
@@ -476,11 +481,11 @@ const ChatRoom = () => {
 
     useEffect(() => {
         if (!localConversationId) return;
-        console.log('🎧 开始监听WebSocket消息，会话ID:', localConversationId);
+        logger.debug('开始监听WebSocket消息，会话ID:', localConversationId);
         const handler = (msg) => messageHandlerRef.current(msg);
         onMessage(handler);
         return () => {
-            console.log('🧹 清理WebSocket监听器');
+            logger.debug('清理WebSocket监听器');
             offMessage(handler);
         };
     }, [localConversationId, onMessage, offMessage]); // 注意：依赖数组中去掉了 handleWebSocketMessage
@@ -488,7 +493,7 @@ const ChatRoom = () => {
     // 消息状态更新
     useEffect(() => {
         if (messageStatusUpdates.size === 0) return;
-        console.log('📊 处理消息状态更新:', messageStatusUpdates);
+        logger.debug('处理消息状态更新:', messageStatusUpdates);
         let hasChanges = false;
         const updatedMessages = messages.map(msg => {
             const tempUpdate = msg.client_msg_id ? messageStatusUpdates.get(String(msg.client_msg_id)) : null;
@@ -498,17 +503,17 @@ const ChatRoom = () => {
             if (String(msg.id).startsWith('temp_') && update.message_id) {
                 newMsg.id = String(update.message_id);
                 hasChanges = true;
-                console.log('🆔 更新消息ID:', { old: msg.id, new: newMsg.id });
+                logger.debug('更新消息ID:', { old: msg.id, new: newMsg.id });
             }
             if (update.status !== undefined && newMsg.status !== update.status) {
                 newMsg.status = update.status;
                 hasChanges = true;
-                console.log('🔄 更新消息状态:', { id: newMsg.id, oldStatus: msg.status, newStatus: update.status });
+                logger.debug('更新消息状态:', { id: newMsg.id, oldStatus: msg.status, newStatus: update.status });
             }
             return newMsg;
         });
         if (hasChanges) {
-            console.log('✅ 应用消息状态更新');
+            logger.debug('应用消息状态更新');
             setMessages(updatedMessages);
         }
     }, [messageStatusUpdates, messages]);
@@ -529,7 +534,7 @@ const ChatRoom = () => {
     // 发送消息
     const handleSendMessage = async () => {
         if (!inputMessage.trim() || !currentUser || !conversation) {
-            console.error('发送消息条件不满足');
+            logger.warn('发送消息条件不满足');
             return;
         }
         let receiverId;
@@ -539,7 +544,8 @@ const ChatRoom = () => {
                 memberId => String(memberId) !== String(currentUser.id)
             );
             if (!otherMember) {
-                console.error('无法确定接收者');
+                logger.warn('无法确定接收者');
+                showNotice('error', '无法确定接收者');
                 return;
             }
             receiverId = String(otherMember);
@@ -557,10 +563,10 @@ const ChatRoom = () => {
             content: { text: inputMessage.trim() },
             client_msg_id: clientMsgId
         };
-        console.log('📤 发送消息 payload:', messagePayload);
+        logger.debug('发送消息 payload:', messagePayload);
         if (!isConnected()) {
-            console.error('WebSocket未连接，无法发送消息');
-            alert('连接已断开，请稍后重试');
+            logger.warn('WebSocket未连接，无法发送消息');
+            showNotice('error', '连接已断开，请稍后重试');
             return;
         }
         const tempMessage = {
@@ -576,16 +582,16 @@ const ChatRoom = () => {
             created_at: new Date().toISOString(),
             client_msg_id: clientMsgId
         };
-        console.log('➕ 添加临时消息:', tempMessage);
+        logger.debug('添加临时消息:', tempMessage);
         setMessages(prev => [...prev, tempMessage]);
         setInputMessage('');
         const success = wsSendMessage(messagePayload);
         if (!success) {
-            console.error('❌ WebSocket发送失败');
+            logger.warn('WebSocket发送失败');
             setMessages(prev => prev.map(msg =>
                 msg.id === clientMsgId ? { ...msg, status: 99 } : msg
             ));
-            alert('消息发送失败，请检查网络连接');
+            showNotice('error', '消息发送失败，请检查网络连接');
         }
         scrollToBottom();
     };
@@ -623,14 +629,15 @@ const ChatRoom = () => {
                 );
             }
         } catch (error) {
-            console.error('撤回消息失败:', error);
+            logger.warn('撤回消息失败:', error);
+            showNotice('error', '撤回失败，请稍后重试');
         }
     };
 
     const handleLoadMore = useCallback(() => {
         if (hasMore && !loadingMore && messages.length > 0) {
             const lastMsgId = messages[0]?.id || "0";
-            console.log('加载更多消息，lastMsgId:', lastMsgId);
+            logger.debug('加载更多消息，lastMsgId:', lastMsgId);
             fetchMessages(page + 1, lastMsgId);
         }
     }, [hasMore, loadingMore, messages, page, fetchMessages]);
@@ -657,7 +664,7 @@ const ChatRoom = () => {
             }
             return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         } catch (error) {
-            console.error('格式化时间错误:', error);
+            logger.warn('格式化时间错误:', error);
             return '';
         }
     };
@@ -718,6 +725,11 @@ const ChatRoom = () => {
     return (
         <div className="chat-room">
             {renderDebugInfo()}
+            {notice && (
+                <div className={`chat-notice ${notice.type}`}>
+                    {notice.text}
+                </div>
+            )}
 
             <div className="chat-header">
                 <button className="back-btn" onClick={() => navigate(-1)}>
@@ -829,18 +841,18 @@ const ChatRoom = () => {
                                                                             const modeRes = await groupApi.checkGroupAddMode(groupId);
                                                                             if (modeRes?.add_mode === 0) {
                                                                                 await groupApi.enterGroupDirectly(groupId);
-                                                                                alert('已加入群聊');
+                                                                                showNotice('success', '已加入群聊');
                                                                                 navigate(`/group/${groupId}`);
                                                                             } else {
                                                                                 const reason = prompt('请输入申请理由：');
                                                                                 if (reason !== null) {
                                                                                     await groupApi.applyJoinGroup(groupId, reason);
-                                                                                    alert('申请已提交，等待审核');
+                                                                                    showNotice('success', '申请已提交，等待审核');
                                                                                 }
                                                                             }
                                                                         } catch (error) {
-                                                                            console.error('加入群聊失败', error);
-                                                                            alert('加入失败，请稍后重试');
+                                                                            logger.warn('加入群聊失败', error);
+                                                                            showNotice('error', '加入失败，请稍后重试');
                                                                         }
                                                                     }
                                                                 }}

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import SparkMD5 from 'spark-md5';
 import { videoApi } from '../../api/video';
 import { getCurrentUser } from '../../api/user';
+import { FiImage, FiUploadCloud, FiVideo } from 'react-icons/fi';
 import './Upload.css';
 
 const Upload = () => {
@@ -39,7 +40,6 @@ const Upload = () => {
                     loadNext();
                 } else {
                     const hash = spark.end();
-                    console.log(`文件 ${file.name} 的MD5 hash:`, hash);
                     resolve(hash);
                 }
             };
@@ -88,9 +88,7 @@ const Upload = () => {
             try {
                 const hash = await calculateFileMD5(file);
                 setVideoHash(hash);
-                console.log('视频文件hash:', hash);
-            } catch (error) {
-                console.error('计算视频hash失败:', error);
+            } catch {
                 setError('计算视频文件hash失败');
             } finally {
                 setStepMessage('');
@@ -122,9 +120,7 @@ const Upload = () => {
             try {
                 const hash = await calculateFileMD5(file);
                 setCoverHash(hash);
-                console.log('封面文件hash:', hash);
-            } catch (error) {
-                console.error('计算封面hash失败:', error);
+            } catch {
                 setError('计算封面文件hash失败');
             } finally {
                 setStepMessage('');
@@ -167,23 +163,6 @@ const Upload = () => {
                 throw new Error('请先登录');
             }
 
-            console.log('开始上传流程...');
-            console.log('视频信息:', {
-                file: videoFile.name,
-                size: videoFile.size,
-                type: videoFile.type,
-                hash: videoHash
-            });
-
-            if (coverFile) {
-                console.log('封面信息:', {
-                    file: coverFile.name,
-                    size: coverFile.size,
-                    type: coverFile.type,
-                    hash: coverHash
-                });
-            }
-
             // 1. 预注册上传视频
             setProgress(10);
             setStepMessage('正在准备上传视频...');
@@ -195,8 +174,6 @@ const Upload = () => {
                 filename: videoFile.name
             });
 
-            console.log('视频预签名响应:', videoPreSignResp);
-
             if (!videoPreSignResp.url || !videoPreSignResp.file_id) {
                 throw new Error('获取视频上传地址失败');
             }
@@ -205,21 +182,19 @@ const Upload = () => {
             setProgress(30);
             setStepMessage('正在上传视频文件...');
 
-            await uploadToMinio(videoPreSignResp.url, videoFile, videoHash);
+            await uploadToMinio(videoPreSignResp.url, videoFile);
 
             // 3. 报告视频上传完成，获取视频URL
             setProgress(50);
             setStepMessage('正在处理视频文件...');
 
             const videoFinishResp = await videoApi.reportFinishUpload(videoPreSignResp.file_id);
-            console.log('视频完成响应:', videoFinishResp);
 
             if (!videoFinishResp.url) {
                 throw new Error('获取视频访问地址失败');
             }
 
             let coverUrl = '';
-            let coverFileId = 0;
             if (coverFile && coverHash) {
                 try {
                     // 4. 预注册上传封面
@@ -233,34 +208,26 @@ const Upload = () => {
                         filename: coverFile.name
                     });
 
-                    console.log('封面预签名响应:', coverPreSignResp);
-
                     if (!coverPreSignResp.url || !coverPreSignResp.file_id) {
                         throw new Error('获取封面上传地址失败');
                     }
-
-                    coverFileId = coverPreSignResp.file_id;
 
                     // 5. 上传封面到minio
                     setProgress(70);
                     setStepMessage('正在上传封面图片...');
 
-                    await uploadToMinio(coverPreSignResp.url, coverFile, coverHash);
+                    await uploadToMinio(coverPreSignResp.url, coverFile);
 
                     // 6. 报告封面上传完成，获取封面URL
                     setProgress(80);
                     setStepMessage('正在处理封面图片...');
 
                     const coverFinishResp = await videoApi.reportFinishUpload(coverPreSignResp.file_id);
-                    console.log('封面完成响应:', coverFinishResp);
 
                     if (coverFinishResp.url) {
                         coverUrl = coverFinishResp.url;
-                    } else {
-                        console.warn('获取封面访问地址失败，将继续上传视频');
                     }
-                } catch (coverError) {
-                    console.warn('封面上传失败，将继续上传视频:', coverError);
+                } catch {
                     // 封面失败不影响视频上传
                 }
             }
@@ -281,11 +248,7 @@ const Upload = () => {
                 videoData.cover_url = coverUrl;
             }
 
-            console.log('提交视频信息:', videoData);
-
             const videoFinalResp = await videoApi.reportVideoFinishUpload(videoData);
-
-            console.log('视频最终响应:', videoFinalResp);
 
             if (!videoFinalResp.video_id) {
                 throw new Error('视频保存失败');
@@ -301,7 +264,6 @@ const Upload = () => {
             }, 3000);
 
         } catch (error) {
-            console.error('上传失败:', error);
             setError(`上传失败: ${error.message || '未知错误'}`);
 
             // 如果是hash验证失败，提示用户
@@ -313,15 +275,8 @@ const Upload = () => {
         }
     };
 
-    const uploadToMinio = async (url, file, expectedHash) => {
+    const uploadToMinio = async (url, file) => {
         try {
-            console.log('开始上传文件到minio:', {
-                url,
-                fileSize: file.size,
-                fileName: file.name,
-                expectedHash
-            });
-
             const response = await fetch(url, {
                 method: 'PUT',
                 headers: {
@@ -330,20 +285,12 @@ const Upload = () => {
                 body: file
             });
 
-            console.log('minio上传响应:', {
-                status: response.status,
-                statusText: response.statusText,
-                ok: response.ok
-            });
-
             if (!response.ok) {
                 throw new Error(`minio上传失败: ${response.status} ${response.statusText}`);
             }
 
-            console.log('minio上传成功');
             return response;
         } catch (error) {
-            console.error('minio上传失败:', error);
             throw new Error(`文件上传失败: ${error.message}`);
         }
     };
@@ -422,7 +369,7 @@ const Upload = () => {
                             />
                             {videoFile ? (
                                 <div className="file-info">
-                                    <div className="file-icon">📹</div>
+                                    <FiVideo className="file-icon" />
                                     <div className="file-details">
                                         <p className="file-name">{videoFile.name}</p>
                                         <p className="file-size">
@@ -438,7 +385,7 @@ const Upload = () => {
                                 </div>
                             ) : (
                                 <div className="file-prompt">
-                                    <div className="upload-icon">📤</div>
+                                    <FiUploadCloud className="upload-icon" />
                                     <p>点击选择视频文件</p>
                                     <p className="file-hint">支持 MP4, WebM, OGG, MOV，最大 100MB</p>
                                 </div>
@@ -463,7 +410,7 @@ const Upload = () => {
                             />
                             {coverFile ? (
                                 <div className="file-info">
-                                    <div className="file-icon">🖼️</div>
+                                    <FiImage className="file-icon" />
                                     <div className="file-details">
                                         <p className="file-name">{coverFile.name}</p>
                                         <p className="file-size">
@@ -479,7 +426,7 @@ const Upload = () => {
                                 </div>
                             ) : (
                                 <div className="file-prompt">
-                                    <div className="upload-icon">🖼️</div>
+                                    <FiImage className="upload-icon" />
                                     <p>点击选择封面图片</p>
                                     <p className="file-hint">支持 JPG, PNG, GIF, WebP，最大 5MB</p>
                                 </div>
