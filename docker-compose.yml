@@ -1,0 +1,13 @@
+name: lehu-video-frontend
+
+services:
+  web:
+    build:
+      context: .
+      args:
+        VITE_API_BASE_URL: http://localhost:18080/v1
+        VITE_WS_URL: ws://localhost:18080/ws
+        VITE_JWT_SECRET: fireshine
+    container_name: lehu-frontend
+    ports:
+      - "15173:80"
