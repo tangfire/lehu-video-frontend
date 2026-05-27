@@ -41,3 +41,24 @@ export const toArrayFromLines = (value) => value
     .split('\n')
     .map((item) => item.trim())
     .filter(Boolean);
+
+export const compactNumber = (value) => {
+    const number = Number(value || 0);
+    if (number >= 10000) return `${(number / 10000).toFixed(1)}w`;
+    if (number >= 1000) return `${(number / 1000).toFixed(1)}k`;
+    return String(number);
+};
+
+export const percentText = (numerator, denominator) => {
+    const total = Number(denominator || 0);
+    if (total <= 0) return '0%';
+    return `${Math.round((Number(numerator || 0) / total) * 100)}%`;
+};
+
+export const postCover = (post) => post?.cover_url || post?.images?.[0] || '';
+
+export const excerpt = (value, max = 72) => {
+    const text = String(value || '').replace(/\s+/g, ' ').trim();
+    if (text.length <= max) return text;
+    return `${text.slice(0, max)}...`;
+};

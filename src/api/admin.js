@@ -6,6 +6,12 @@ export const campusAdminApi = {
     createPost: (data) => request.post('/campus/admin/posts', data),
     updatePost: (id, data) => request.put(`/campus/admin/posts/${id}`, data),
     deletePost: (id) => request.delete(`/campus/admin/posts/${id}`),
+    batchPosts: (data) => request.post('/campus/admin/posts/batch', data),
+    uploadImage: (file) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        return request.post('/campus/upload/image', formData);
+    },
     listComments: (params) => request.get('/campus/admin/comments', { params }),
     deleteComment: (id) => request.delete(`/campus/admin/comments/${id}`),
     listReports: (params) => request.get('/campus/admin/reports', { params }),

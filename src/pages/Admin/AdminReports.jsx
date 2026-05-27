@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { campusAdminApi } from '../../api/admin';
 import './Admin.css';
 
@@ -8,16 +9,18 @@ const reportStatusText = (status) => {
 };
 
 const AdminReports = () => {
+    const [searchParams] = useSearchParams();
+    const statusParam = searchParams.get('status') || '-1';
     const [reports, setReports] = useState([]);
-    const [status, setStatus] = useState('-1');
+    const [status, setStatus] = useState(statusParam);
     const [page, setPage] = useState(1);
     const [total, setTotal] = useState(0);
     const [error, setError] = useState('');
 
-    const load = async (nextPage = page) => {
+    const load = async (nextPage = page, nextStatus = status) => {
         setError('');
         try {
-            const data = await campusAdminApi.listReports({ page: nextPage, size: 20, status });
+            const data = await campusAdminApi.listReports({ page: nextPage, size: 20, status: nextStatus });
             setReports(data.reports || []);
             setTotal(data.page_stats?.total || 0);
             setPage(nextPage);
@@ -27,9 +30,10 @@ const AdminReports = () => {
     };
 
     useEffect(() => {
-        load(1);
+        setStatus(statusParam);
+        load(1, statusParam);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [statusParam]);
 
     const review = async (report, action) => {
         await campusAdminApi.reviewReport(report.id, { action, reason: action === 'resolve' ? '已处理' : '已驳回' });

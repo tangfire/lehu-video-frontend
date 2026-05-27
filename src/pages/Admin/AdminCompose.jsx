@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { FiCheck, FiImage, FiPlus, FiSend, FiUploadCloud, FiVideo, FiX } from 'react-icons/fi';
 import { campusAdminApi } from '../../api/admin';
-import { toArrayFromLines } from './adminUtils';
+import { excerpt, postTypeText, toArrayFromLines } from './adminUtils';
 import './Admin.css';
 
 const initialForm = {
@@ -21,6 +22,7 @@ const initialForm = {
 const contentTemplates = [
     {
         name: '报到总攻略',
+        badge: '开学必看',
         category_code: 'guide',
         post_type: 'guide',
         title: '深汕校区新生报到前，先把这几件事确认好',
@@ -29,6 +31,7 @@ const contentTemplates = [
     },
     {
         name: '宿舍 FAQ',
+        badge: '高收藏',
         category_code: 'life',
         post_type: 'guide',
         title: '宿舍入住 FAQ：哪些东西先别急着买？',
@@ -37,6 +40,7 @@ const contentTemplates = [
     },
     {
         name: '交通路线',
+        badge: '转发友好',
         category_code: 'life',
         post_type: 'guide',
         title: '第一次去深汕校区，到校路线怎么规划？',
@@ -45,6 +49,7 @@ const contentTemplates = [
     },
     {
         name: '课表导入说明',
+        badge: '功能引导',
         category_code: 'study',
         post_type: 'guide',
         title: '课表导入怎么用？开学后看这一篇就够了',
@@ -53,6 +58,7 @@ const contentTemplates = [
     },
     {
         name: '问答引导',
+        badge: '拉互动',
         category_code: 'qa',
         post_type: 'question',
         title: '新生有什么想提前问的？可以直接在评论区问',
@@ -67,6 +73,8 @@ const AdminCompose = () => {
     const [message, setMessage] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [uploading, setUploading] = useState(false);
+    const fileInputRef = useRef(null);
 
     useEffect(() => {
         campusAdminApi.listCategories()
@@ -74,8 +82,20 @@ const AdminCompose = () => {
             .catch(() => setCategories([]));
     }, []);
 
+    const images = useMemo(() => toArrayFromLines(form.images), [form.images]);
+    const previewCover = form.cover_url || images[0] || '';
+
     const update = (key, value) => {
         setForm((prev) => ({ ...prev, [key]: value }));
+    };
+
+    const updateImages = (nextImages, nextCover = form.cover_url) => {
+        setForm((prev) => ({
+            ...prev,
+            media_type: nextImages.length > 0 ? 'image' : (prev.media_type === 'image' ? 'text' : prev.media_type),
+            images: nextImages.join('\n'),
+            cover_url: nextCover || nextImages[0] || '',
+        }));
     };
 
     const applyTemplate = (template) => {
@@ -94,20 +114,53 @@ const AdminCompose = () => {
         setError('');
     };
 
+    const uploadImages = async (event) => {
+        const files = Array.from(event.target.files || []);
+        event.target.value = '';
+        if (files.length === 0) return;
+        if (images.length + files.length > 9) {
+            setError('图文笔记最多 9 张图片');
+            return;
+        }
+        setUploading(true);
+        setError('');
+        setMessage('');
+        try {
+            const urls = [];
+            for (const file of files) {
+                const data = await campusAdminApi.uploadImage(file);
+                if (data.url) urls.push(data.url);
+            }
+            updateImages([...images, ...urls]);
+            setMessage(`已上传 ${urls.length} 张图片`);
+        } catch (err) {
+            setError(err.message || '图片上传失败');
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    const removeImage = (url) => {
+        const nextImages = images.filter((item) => item !== url);
+        updateImages(nextImages, form.cover_url === url ? nextImages[0] || '' : form.cover_url);
+    };
+
     const submit = async (event) => {
         event.preventDefault();
         setLoading(true);
         setError('');
         setMessage('');
         try {
+            const nextImages = toArrayFromLines(form.images);
+            const mediaType = form.media_type === 'text' && nextImages.length > 0 ? 'image' : form.media_type;
             await campusAdminApi.createPost({
                 category_code: form.category_code,
                 post_type: form.post_type,
-                media_type: form.media_type,
+                media_type: mediaType,
                 title: form.title,
                 content: form.content,
-                images: toArrayFromLines(form.images),
-                cover_url: form.cover_url,
+                images: nextImages,
+                cover_url: form.cover_url || nextImages[0] || '',
                 video_url: form.video_url,
                 is_official: form.is_official,
                 is_featured: form.is_featured,
@@ -124,45 +177,41 @@ const AdminCompose = () => {
     };
 
     return (
-        <form className="admin-form" onSubmit={submit}>
-            {message && <div className="admin-tag">{message}</div>}
+        <form className="admin-compose-page" onSubmit={submit}>
+            {message && <div className="admin-toast success">{message}</div>}
             {error && <div className="admin-error">{error}</div>}
             <div className="admin-composer-grid">
                 <section className="admin-panel">
-                    <h2>运营种子内容</h2>
-                    <div className="admin-template-row">
+                    <div className="admin-panel-head">
+                        <div>
+                            <h2>运营发帖</h2>
+                            <p>用深汕e仔官方号快速发布攻略、问答和社团招新内容。</p>
+                        </div>
+                        <button className="admin-button primary" disabled={loading || uploading}>
+                            <FiSend />
+                            {loading ? '发布中...' : '发布'}
+                        </button>
+                    </div>
+
+                    <div className="admin-template-grid">
                         {contentTemplates.map((template) => (
-                            <button className="admin-button" type="button" key={template.name} onClick={() => applyTemplate(template)}>
-                                {template.name}
+                            <button className="admin-template-card" type="button" key={template.name} onClick={() => applyTemplate(template)}>
+                                <span>{template.badge}</span>
+                                <strong>{template.name}</strong>
+                                <p>{excerpt(template.title, 28)}</p>
                             </button>
                         ))}
                     </div>
-                    <div className="admin-form">
-                        <div className="admin-field">
+
+                    <div className="admin-form two">
+                        <div className="admin-field wide">
                             <label>标题</label>
-                            <input className="admin-input" value={form.title} onChange={(e) => update('title', e.target.value)} maxLength={60} />
+                            <input className="admin-input" value={form.title} onChange={(e) => update('title', e.target.value)} maxLength={60} placeholder="建议 18-32 字，像小红书笔记标题一样直接有用" />
                         </div>
-                        <div className="admin-field">
+                        <div className="admin-field wide">
                             <label>正文</label>
-                            <textarea className="admin-textarea" value={form.content} onChange={(e) => update('content', e.target.value)} maxLength={2000} />
+                            <textarea className="admin-textarea tall" value={form.content} onChange={(e) => update('content', e.target.value)} maxLength={2000} placeholder="把最重要的信息放在前两行，方便首页卡片抓住新生注意力。" />
                         </div>
-                        <div className="admin-field">
-                            <label>图片 URL，一行一个</label>
-                            <textarea className="admin-textarea" value={form.images} onChange={(e) => update('images', e.target.value)} placeholder="图文笔记可填写 1-9 张图片地址" />
-                        </div>
-                        <div className="admin-field">
-                            <label>封面 URL</label>
-                            <input className="admin-input" value={form.cover_url} onChange={(e) => update('cover_url', e.target.value)} />
-                        </div>
-                        <div className="admin-field">
-                            <label>视频 URL</label>
-                            <input className="admin-input" value={form.video_url} onChange={(e) => update('video_url', e.target.value)} />
-                        </div>
-                    </div>
-                </section>
-                <section className="admin-panel">
-                    <h2>发布设置</h2>
-                    <div className="admin-form">
                         <div className="admin-field">
                             <label>版块</label>
                             <select className="admin-select" value={form.category_code} onChange={(e) => update('category_code', e.target.value)}>
@@ -194,23 +243,97 @@ const AdminCompose = () => {
                             <label>排序权重</label>
                             <input className="admin-input" type="number" value={form.sort_weight} onChange={(e) => update('sort_weight', e.target.value)} />
                         </div>
-                        <div className="admin-checks">
+                    </div>
+
+                    <div className="admin-upload-panel">
+                        <div className="admin-upload-head">
+                            <div>
+                                <h3>图片素材</h3>
+                                <p>可直接上传图片，第一张默认作为首页封面。</p>
+                            </div>
+                            <button className="admin-button" type="button" disabled={uploading || images.length >= 9} onClick={() => fileInputRef.current?.click()}>
+                                <FiUploadCloud />
+                                {uploading ? '上传中...' : '上传图片'}
+                            </button>
+                            <input ref={fileInputRef} type="file" accept="image/*" multiple hidden onChange={uploadImages} />
+                        </div>
+                        <div className="admin-upload-grid">
+                            {images.map((url) => (
+                                <div className="admin-upload-item" key={url}>
+                                    <img src={url} alt="" />
+                                    {form.cover_url === url && <span><FiCheck /> 封面</span>}
+                                    <button type="button" onClick={() => removeImage(url)}><FiX /></button>
+                                </div>
+                            ))}
+                            {images.length < 9 && (
+                                <button className="admin-upload-add" type="button" disabled={uploading} onClick={() => fileInputRef.current?.click()}>
+                                    <FiPlus />
+                                    添加图片
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="admin-form two">
+                        <div className="admin-field">
+                            <label>封面 URL</label>
+                            <input className="admin-input" value={form.cover_url} onChange={(e) => update('cover_url', e.target.value)} placeholder="为空时自动取第一张图片" />
+                        </div>
+                        <div className="admin-field">
+                            <label>视频 URL</label>
+                            <input className="admin-input" value={form.video_url} onChange={(e) => update('video_url', e.target.value)} placeholder="视频内容先填写 URL，后台暂不上传大视频" />
+                        </div>
+                    </div>
+                </section>
+
+                <aside className="admin-compose-aside">
+                    <section className="admin-panel">
+                        <h2>发布设置</h2>
+                        <div className="admin-switch-list">
                             <label>
                                 <input type="checkbox" checked={form.is_official} onChange={(e) => update('is_official', e.target.checked)} />
-                                官方标识
+                                <span>官方标识</span>
+                                <em>显示“深汕e仔 / 官方”</em>
                             </label>
                             <label>
                                 <input type="checkbox" checked={form.is_featured} onChange={(e) => update('is_featured', e.target.checked)} />
-                                精选推荐
+                                <span>精选推荐</span>
+                                <em>提升推荐排序</em>
                             </label>
                             <label>
                                 <input type="checkbox" checked={form.is_pinned} onChange={(e) => update('is_pinned', e.target.checked)} />
-                                首页置顶
+                                <span>首页置顶</span>
+                                <em>适合报到总攻略</em>
                             </label>
                         </div>
-                        <button className="admin-button primary" disabled={loading}>{loading ? '发布中...' : '发布'}</button>
-                    </div>
-                </section>
+                    </section>
+
+                    <section className="admin-preview-panel">
+                        <div className="admin-phone-preview">
+                            <div className="admin-preview-cover">
+                                {previewCover ? (
+                                    <img src={previewCover} alt="" />
+                                ) : form.media_type === 'video' ? (
+                                    <div><FiVideo /> 视频封面</div>
+                                ) : (
+                                    <div><FiImage /> 文字笔记</div>
+                                )}
+                                {form.media_type === 'video' && <span className="admin-video-badge"><FiVideo /> 视频</span>}
+                            </div>
+                            <div className="admin-preview-body">
+                                <h3>{form.title || '给新生看的实用标题'}</h3>
+                                <p>{excerpt(form.content, 54) || '正文前两行会影响首页点击，建议直接写清楚能解决什么问题。'}</p>
+                                <div className="admin-preview-author">
+                                    <span>深汕e仔</span>
+                                    {form.is_official && <em>官方</em>}
+                                    {form.is_pinned && <em>置顶</em>}
+                                    {form.is_featured && <em>精选</em>}
+                                </div>
+                                <div className="admin-muted">{postTypeText(form.post_type)} · 权重 {form.sort_weight || 0}</div>
+                            </div>
+                        </div>
+                    </section>
+                </aside>
             </div>
         </form>
     );

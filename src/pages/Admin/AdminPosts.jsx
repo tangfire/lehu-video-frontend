@@ -1,30 +1,110 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { FiCheckCircle, FiImage, FiMoreHorizontal, FiSearch, FiTrash2, FiVideo } from 'react-icons/fi';
 import { campusAdminApi } from '../../api/admin';
-import { mediaTypeText, postTypeText, statusText } from './adminUtils';
+import { compactNumber, excerpt, mediaTypeText, postCover, postTypeText, statusText } from './adminUtils';
 import './Admin.css';
 
+const pageSize = 20;
+
+const initialFilters = {
+    keyword: '',
+    status: '-1',
+    postType: '',
+    categoryCode: '',
+    opsFilter: '',
+};
+
+const postTypeOptions = [
+    ['全部类型', ''],
+    ['普通笔记', 'note'],
+    ['攻略', 'guide'],
+    ['问答', 'question'],
+    ['失物', 'lost'],
+    ['社团', 'club'],
+];
+
+const opsOptions = [
+    ['全部运营状态', ''],
+    ['官方内容', 'official'],
+    ['精选内容', 'featured'],
+    ['置顶内容', 'pinned'],
+];
+
+const statusOptions = [
+    ['全部状态', '-1'],
+    ['可见', '1'],
+    ['待审核', '0'],
+    ['已拒绝', '2'],
+    ['已删除', '3'],
+];
+
+const batchActions = [
+    ['pin', '批量置顶'],
+    ['unpin', '取消置顶'],
+    ['feature', '设为精选'],
+    ['unfeature', '取消精选'],
+    ['official', '设为官方'],
+    ['unofficial', '取消官方'],
+    ['visible', '通过可见'],
+    ['delete', '下架'],
+];
+
+const buildPostPayload = (post, patch) => ({
+    category_code: post.category_code,
+    title: post.title,
+    content: post.content,
+    images: post.images || [],
+    media_type: post.media_type || 'text',
+    post_type: post.post_type || 'note',
+    extra: post.extra || {},
+    cover_url: post.cover_url || '',
+    video_url: post.video_url || '',
+    status: Number(post.status ?? 1),
+    audit_reason: post.audit_reason || '',
+    is_official: Boolean(post.is_official),
+    is_featured: Boolean(post.is_featured),
+    is_pinned: Boolean(post.is_pinned),
+    sort_weight: Number(post.sort_weight || 0),
+    ...patch,
+});
+
 const AdminPosts = () => {
+    const [searchParams] = useSearchParams();
+    const initialStatus = searchParams.get('status') || initialFilters.status;
     const [posts, setPosts] = useState([]);
+    const [categories, setCategories] = useState([]);
     const [page, setPage] = useState(1);
     const [total, setTotal] = useState(0);
-    const [keyword, setKeyword] = useState('');
-    const [status, setStatus] = useState('-1');
+    const [filters, setFilters] = useState({ ...initialFilters, status: initialStatus });
+    const [selectedIds, setSelectedIds] = useState([]);
+    const [weightValue, setWeightValue] = useState('100');
+    const [confirmAction, setConfirmAction] = useState(null);
+    const [message, setMessage] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [actionLoading, setActionLoading] = useState(false);
 
-    const load = async (nextPage = page) => {
+    const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+    const allCurrentSelected = posts.length > 0 && posts.every((post) => selectedSet.has(String(post.id)));
+
+    const load = async (nextPage = page, nextFilters = filters) => {
         setLoading(true);
         setError('');
         try {
             const data = await campusAdminApi.listPosts({
                 page: nextPage,
-                size: 20,
-                keyword,
-                status,
+                size: pageSize,
+                keyword: nextFilters.keyword,
+                status: nextFilters.status,
+                post_type: nextFilters.postType,
+                category_code: nextFilters.categoryCode,
+                ops_filter: nextFilters.opsFilter,
             });
             setPosts(data.posts || []);
             setTotal(data.page_stats?.total || 0);
             setPage(nextPage);
+            setSelectedIds([]);
         } catch (err) {
             setError(err.message || '获取内容失败');
         } finally {
@@ -33,111 +113,243 @@ const AdminPosts = () => {
     };
 
     useEffect(() => {
-        load(1);
+        campusAdminApi.listCategories()
+            .then((data) => setCategories(data.categories || []))
+            .catch(() => setCategories([]));
+        const nextFilters = { ...initialFilters, status: initialStatus };
+        setFilters(nextFilters);
+        load(1, nextFilters);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [initialStatus]);
 
-    const updatePost = async (post, patch) => {
-        await campusAdminApi.updatePost(post.id, {
-            category_code: post.category_code,
-            title: post.title,
-            content: post.content,
-            images: post.images || [],
-            media_type: post.media_type,
-            post_type: post.post_type,
-            extra: post.extra || {},
-            cover_url: post.cover_url,
-            video_url: post.video_url,
-            status: post.status,
-            audit_reason: post.audit_reason || '',
-            is_official: post.is_official,
-            is_featured: post.is_featured,
-            is_pinned: post.is_pinned,
-            sort_weight: post.sort_weight || 0,
-            ...patch,
-        });
-        load(page);
+    const updateFilter = (key, value) => {
+        setFilters((prev) => ({ ...prev, [key]: value }));
     };
 
-    const deletePost = async (post) => {
-        if (!window.confirm(`确认下架/删除「${post.title}」吗？`)) return;
-        await campusAdminApi.deletePost(post.id);
-        load(page);
+    const showMessage = (text) => {
+        setMessage(text);
+        window.setTimeout(() => setMessage(''), 2600);
+    };
+
+    const updatePost = async (post, patch, successText = '内容已更新') => {
+        setActionLoading(true);
+        setError('');
+        try {
+            await campusAdminApi.updatePost(post.id, buildPostPayload(post, patch));
+            showMessage(successText);
+            await load(page);
+        } catch (err) {
+            setError(err.message || '操作失败');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const runBatch = async (action, extra = {}) => {
+        if (selectedIds.length === 0) {
+            setError('请先选择内容');
+            return;
+        }
+        setActionLoading(true);
+        setError('');
+        try {
+            const data = await campusAdminApi.batchPosts({
+                ids: selectedIds.map((id) => Number(id)),
+                action,
+                ...extra,
+            });
+            showMessage(`已更新 ${data.updated_count || selectedIds.length} 条内容`);
+            setConfirmAction(null);
+            await load(page);
+        } catch (err) {
+            setError(err.message || '批量操作失败');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const toggleSelected = (id) => {
+        const key = String(id);
+        setSelectedIds((prev) => prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key]);
+    };
+
+    const toggleAllCurrent = () => {
+        if (allCurrentSelected) {
+            setSelectedIds([]);
+            return;
+        }
+        setSelectedIds(posts.map((post) => String(post.id)));
+    };
+
+    const saveWeight = (post, value) => {
+        const weight = Number(value || 0);
+        updatePost(post, { sort_weight: weight }, '权重已保存');
     };
 
     return (
-        <>
-            <div className="admin-toolbar">
-                <input className="admin-input" value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="搜索标题/正文" />
-                <select className="admin-select" value={status} onChange={(e) => setStatus(e.target.value)}>
-                    <option value="-1">全部状态</option>
-                    <option value="1">可见</option>
-                    <option value="0">待审核</option>
-                    <option value="2">已拒绝</option>
-                    <option value="3">已删除</option>
-                </select>
-                <button className="admin-button primary" onClick={() => load(1)} disabled={loading}>查询</button>
-            </div>
+        <div className="admin-workbench">
+            {message && <div className="admin-toast success">{message}</div>}
             {error && <div className="admin-error">{error}</div>}
-            <div className="admin-table-wrap">
-                <table className="admin-table">
-                    <thead>
-                        <tr>
-                            <th>内容</th>
-                            <th>类型</th>
-                            <th>运营</th>
-                            <th>互动</th>
-                            <th>状态</th>
-                            <th>时间</th>
-                            <th>操作</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {posts.map((post) => (
-                            <tr key={post.id}>
-                                <td className="admin-title-cell">
-                                    <strong>{post.title}</strong>
-                                    <div className="admin-muted">{post.content}</div>
-                                </td>
-                                <td>
-                                    <div>{postTypeText(post.post_type)}</div>
-                                    <div className="admin-muted">{mediaTypeText(post.media_type)} · {post.category_name || post.category_code}</div>
-                                </td>
-                                <td>
-                                    {post.is_pinned && <span className="admin-tag warn">置顶</span>}{' '}
-                                    {post.is_official && <span className="admin-tag">官方</span>}{' '}
-                                    {post.is_featured && <span className="admin-tag warn">精选</span>}
-                                    <div className="admin-muted">权重 {post.sort_weight || 0}</div>
-                                </td>
-                                <td>{post.like_count || 0} 赞 · {post.comment_count || 0} 评 · {post.collected_count || 0} 藏</td>
-                                <td>{statusText(post.status)}</td>
-                                <td>{post.created_at}</td>
-                                <td>
-                                    <div className="admin-actions">
-                                        <button className="admin-button" onClick={() => updatePost(post, { is_featured: !post.is_featured })}>
-                                            {post.is_featured ? '取消精选' : '设精选'}
-                                        </button>
-                                        <button className="admin-button" onClick={() => updatePost(post, { is_pinned: !post.is_pinned })}>
-                                            {post.is_pinned ? '取消置顶' : '设置顶'}
-                                        </button>
-                                        <button className="admin-button" onClick={() => updatePost(post, { is_official: !post.is_official })}>
-                                            {post.is_official ? '取消官方' : '设官方'}
-                                        </button>
-                                        <button className="admin-button" onClick={() => updatePost(post, { status: 1 })}>通过</button>
-                                        <button className="admin-button danger" onClick={() => deletePost(post)}>删除</button>
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
+
+            <section className="admin-panel admin-filter-panel">
+                <div className="admin-panel-head">
+                    <div>
+                        <h2>内容工作台</h2>
+                        <p>快速筛选官方内容、精选置顶和待审核内容，适合开学前批量运营。</p>
+                    </div>
+                    <button className="admin-button primary" onClick={() => load(1)} disabled={loading}>
+                        <FiSearch />
+                        查询
+                    </button>
+                </div>
+                <div className="admin-filter-grid">
+                    <input className="admin-input" value={filters.keyword} onChange={(e) => updateFilter('keyword', e.target.value)} placeholder="搜索标题 / 正文" />
+                    <select className="admin-select" value={filters.status} onChange={(e) => updateFilter('status', e.target.value)}>
+                        {statusOptions.map(([label, value]) => <option key={value} value={value}>{label}</option>)}
+                    </select>
+                    <select className="admin-select" value={filters.postType} onChange={(e) => updateFilter('postType', e.target.value)}>
+                        {postTypeOptions.map(([label, value]) => <option key={value} value={value}>{label}</option>)}
+                    </select>
+                    <select className="admin-select" value={filters.categoryCode} onChange={(e) => updateFilter('categoryCode', e.target.value)}>
+                        <option value="">全部版块</option>
+                        {categories.map((item) => <option key={item.code} value={item.code}>{item.name}</option>)}
+                    </select>
+                    <select className="admin-select" value={filters.opsFilter} onChange={(e) => updateFilter('opsFilter', e.target.value)}>
+                        {opsOptions.map(([label, value]) => <option key={value} value={value}>{label}</option>)}
+                    </select>
+                </div>
+            </section>
+
+            <section className="admin-batch-bar">
+                <label className="admin-check-line">
+                    <input type="checkbox" checked={allCurrentSelected} onChange={toggleAllCurrent} />
+                    已选 {selectedIds.length} 条
+                </label>
+                <div className="admin-batch-actions">
+                    {batchActions.map(([action, label]) => {
+                        const needsConfirm = action === 'delete';
+                        return (
+                            <button
+                                className={action === 'delete' ? 'admin-button danger' : 'admin-button'}
+                                type="button"
+                                key={action}
+                                disabled={actionLoading || selectedIds.length === 0}
+                                onClick={() => needsConfirm ? setConfirmAction({ type: 'batch', action, label }) : runBatch(action)}
+                            >
+                                {label}
+                            </button>
+                        );
+                    })}
+                    <input className="admin-input mini" type="number" value={weightValue} onChange={(e) => setWeightValue(e.target.value)} />
+                    <button className="admin-button" disabled={actionLoading || selectedIds.length === 0} onClick={() => runBatch('set_weight', { sort_weight: Number(weightValue || 0) })}>设权重</button>
+                </div>
+            </section>
+
+            <section className="admin-content-list">
+                {loading && <div className="admin-loading">内容加载中...</div>}
+                {!loading && posts.length === 0 && <div className="admin-empty">没有匹配的内容，换个筛选条件试试。</div>}
+                {!loading && posts.map((post) => (
+                    <article className="admin-post-card" key={post.id}>
+                        <label className="admin-post-select">
+                            <input type="checkbox" checked={selectedSet.has(String(post.id))} onChange={() => toggleSelected(post.id)} />
+                        </label>
+                        <div className="admin-post-cover">
+                            {postCover(post) ? (
+                                <img src={postCover(post)} alt="" />
+                            ) : (
+                                <div className="admin-cover-placeholder">
+                                    {post.media_type === 'video' ? <FiVideo /> : <FiImage />}
+                                    <span>{mediaTypeText(post.media_type)}</span>
+                                </div>
+                            )}
+                            {post.media_type === 'video' && <span className="admin-video-badge"><FiVideo /> 视频</span>}
+                        </div>
+                        <div className="admin-post-body">
+                            <div className="admin-post-title-row">
+                                <div>
+                                    <h3>{post.title || '未命名内容'}</h3>
+                                    <p>{excerpt(post.content, 96) || '暂无正文'}</p>
+                                </div>
+                                <span className={`admin-status-pill status-${post.status}`}>{statusText(post.status)}</span>
+                            </div>
+                            <div className="admin-tag-row">
+                                {post.is_pinned && <span className="admin-tag hot">置顶</span>}
+                                {post.is_featured && <span className="admin-tag warn">精选</span>}
+                                {post.is_official && <span className="admin-tag">官方</span>}
+                                <span className="admin-tag neutral">{postTypeText(post.post_type)}</span>
+                                <span className="admin-tag neutral">{post.category_name || post.category_code || '未分组'}</span>
+                            </div>
+                            <div className="admin-post-meta">
+                                <span>{compactNumber(post.like_count)} 赞</span>
+                                <span>{compactNumber(post.comment_count)} 评</span>
+                                <span>{compactNumber(post.collected_count)} 藏</span>
+                                <span>权重 {post.sort_weight || 0}</span>
+                                <span>{post.created_at}</span>
+                            </div>
+                        </div>
+                        <div className="admin-post-ops">
+                            <div className="admin-actions">
+                                <button className={post.is_pinned ? 'admin-button active' : 'admin-button'} disabled={actionLoading} onClick={() => updatePost(post, { is_pinned: !post.is_pinned })}>{post.is_pinned ? '已置顶' : '置顶'}</button>
+                                <button className={post.is_featured ? 'admin-button active' : 'admin-button'} disabled={actionLoading} onClick={() => updatePost(post, { is_featured: !post.is_featured })}>{post.is_featured ? '已精选' : '精选'}</button>
+                                <button className={post.is_official ? 'admin-button active' : 'admin-button'} disabled={actionLoading} onClick={() => updatePost(post, { is_official: !post.is_official })}>{post.is_official ? '官方' : '设官方'}</button>
+                                <button className="admin-button" disabled={actionLoading} onClick={() => updatePost(post, { status: 1, audit_reason: '' }, '内容已设为可见')}><FiCheckCircle /> 可见</button>
+                            </div>
+                            <div className="admin-weight-editor">
+                                <input
+                                    className="admin-input mini"
+                                    type="number"
+                                    defaultValue={post.sort_weight || 0}
+                                    onBlur={(e) => {
+                                        if (Number(e.target.value || 0) !== Number(post.sort_weight || 0)) saveWeight(post, e.target.value);
+                                    }}
+                                />
+                                <button className="admin-button danger" disabled={actionLoading} onClick={() => setConfirmAction({ type: 'single', post, label: '下架内容' })}>
+                                    <FiTrash2 />
+                                    下架
+                                </button>
+                            </div>
+                        </div>
+                    </article>
+                ))}
+            </section>
+
             <div className="admin-pagination">
-                <span className="admin-muted">共 {total} 条</span>
-                <button className="admin-button" disabled={page <= 1} onClick={() => load(page - 1)}>上一页</button>
-                <button className="admin-button" disabled={page * 20 >= total} onClick={() => load(page + 1)}>下一页</button>
+                <span className="admin-muted">共 {total} 条，第 {page} 页</span>
+                <button className="admin-button" disabled={loading || page <= 1} onClick={() => load(page - 1)}>上一页</button>
+                <button className="admin-button" disabled={loading || page * pageSize >= total} onClick={() => load(page + 1)}>下一页</button>
             </div>
-        </>
+
+            {confirmAction && (
+                <div className="admin-modal-backdrop" role="presentation">
+                    <div className="admin-confirm-modal">
+                        <div className="admin-modal-icon"><FiMoreHorizontal /></div>
+                        <h3>{confirmAction.label}</h3>
+                        <p>
+                            {confirmAction.type === 'batch'
+                                ? `将对 ${selectedIds.length} 条内容执行「${confirmAction.label}」，操作后小程序首页会同步变化。`
+                                : `确认下架「${confirmAction.post?.title || '这条内容'}」吗？`}
+                        </p>
+                        <div className="admin-modal-actions">
+                            <button className="admin-button" onClick={() => setConfirmAction(null)}>取消</button>
+                            <button
+                                className="admin-button danger"
+                                disabled={actionLoading}
+                                onClick={() => {
+                                    if (confirmAction.type === 'batch') {
+                                        runBatch(confirmAction.action);
+                                    } else {
+                                        updatePost(confirmAction.post, { status: 3, audit_reason: '运营下架' }, '内容已下架');
+                                        setConfirmAction(null);
+                                    }
+                                }}
+                            >
+                                确认
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
     );
 };
 

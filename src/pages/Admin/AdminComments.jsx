@@ -1,19 +1,22 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { campusAdminApi } from '../../api/admin';
 import { statusText } from './adminUtils';
 import './Admin.css';
 
 const AdminComments = () => {
+    const [searchParams] = useSearchParams();
+    const statusParam = searchParams.get('status') || '-1';
     const [comments, setComments] = useState([]);
-    const [status, setStatus] = useState('-1');
+    const [status, setStatus] = useState(statusParam);
     const [page, setPage] = useState(1);
     const [total, setTotal] = useState(0);
     const [error, setError] = useState('');
 
-    const load = async (nextPage = page) => {
+    const load = async (nextPage = page, nextStatus = status) => {
         setError('');
         try {
-            const data = await campusAdminApi.listComments({ page: nextPage, size: 20, status });
+            const data = await campusAdminApi.listComments({ page: nextPage, size: 20, status: nextStatus });
             setComments(data.comments || []);
             setTotal(data.page_stats?.total || 0);
             setPage(nextPage);
@@ -23,9 +26,10 @@ const AdminComments = () => {
     };
 
     useEffect(() => {
-        load(1);
+        setStatus(statusParam);
+        load(1, statusParam);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [statusParam]);
 
     const remove = async (comment) => {
         if (!window.confirm('确认删除这条评论吗？')) return;

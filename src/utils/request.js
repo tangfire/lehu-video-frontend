@@ -15,6 +15,8 @@ const request = axios.create({
 const pendingRequests = new Map();
 const requestTimers = new Map();
 
+const isFormData = (value) => typeof FormData !== 'undefined' && value instanceof FormData;
+
 // 生成请求唯一标识
 const generateRequestKey = (config) => {
     const url = config.url || '';
@@ -39,6 +41,10 @@ const generateRequestKey = (config) => {
 
     // 如果是 GET 请求，或 URL 匹配读操作列表 → 视为读请求，每次生成唯一 key
     if (methodLower === 'get' || isReadUrl) {
+        return `${method}_${url}_${Date.now()}_${Math.random()}`;
+    }
+
+    if (isFormData(config.data)) {
         return `${method}_${url}_${Date.now()}_${Math.random()}`;
     }
 
@@ -68,8 +74,13 @@ request.interceptors.request.use(
             config.headers.Authorization = `Bearer ${token}`;
         }
 
+        if (isFormData(config.data)) {
+            delete config.headers['Content-Type'];
+            delete config.headers['content-type'];
+        }
+
         // 处理请求数据，确保ID为字符串
-        if (config.data) {
+        if (config.data && !isFormData(config.data)) {
             config.data = processRequestData(config.data);
         }
 
@@ -144,7 +155,7 @@ request.interceptors.response.use(
         if (error.response?.status === 401) {
             clearUserData();
             setTimeout(() => {
-                window.location.href = '/login';
+                window.location.href = window.location.pathname.startsWith('/admin') ? '/admin/login' : '/login';
             }, 100);
         }
 
@@ -162,6 +173,7 @@ request.interceptors.response.use(
 // 处理请求数据，确保ID为字符串
 function processRequestData(data) {
     if (!data || typeof data !== 'object') return data;
+    if (isFormData(data)) return data;
 
     const process = (obj) => {
         if (Array.isArray(obj)) {
