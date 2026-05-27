@@ -18,6 +18,49 @@ const initialForm = {
     sort_weight: 100,
 };
 
+const contentTemplates = [
+    {
+        name: '报到总攻略',
+        category_code: 'guide',
+        post_type: 'guide',
+        title: '深汕校区新生报到前，先把这几件事确认好',
+        content: '报到前建议先确认：录取通知书与身份证是否随身带好；学校官方报到时间和地点；班级群、辅导员通知和缴费状态；到校交通方式；宿舍入住要求。所有细节以学校最新通知为准，深汕e仔会持续整理公开信息。',
+        sort_weight: 300,
+    },
+    {
+        name: '宿舍 FAQ',
+        category_code: 'life',
+        post_type: 'guide',
+        title: '宿舍入住 FAQ：哪些东西先别急着买？',
+        content: '建议先带第一周一定会用的：证件、换洗衣物、洗漱用品、常用药、充电器、少量衣架。床帘、收纳架、台灯等尺寸相关物品，最好到校确认床位和宿舍规则后再买，避免买错规格。',
+        sort_weight: 260,
+    },
+    {
+        name: '交通路线',
+        category_code: 'life',
+        post_type: 'guide',
+        title: '第一次去深汕校区，到校路线怎么规划？',
+        content: '深汕校区位于深汕特别合作区，开学前建议优先关注学校招生网、学生处或辅导员发布的接站安排。自行到校的同学，提前确认高铁/大巴到站、转乘方式、报到入口和预计到达时间。',
+        sort_weight: 240,
+    },
+    {
+        name: '课表导入说明',
+        category_code: 'study',
+        post_type: 'guide',
+        title: '课表导入怎么用？开学后看这一篇就够了',
+        content: '进入底部“课表”，登录后输入学号和教务密码即可导入。密码只用于本次导入，不会在平台保存。后续如果学校开放正式接口，我们会切换成更安全的一键授权方式。',
+        sort_weight: 220,
+    },
+    {
+        name: '问答引导',
+        category_code: 'qa',
+        post_type: 'question',
+        title: '新生有什么想提前问的？可以直接在评论区问',
+        content: '关于报到、宿舍、交通、课表、校园网、生活用品、社团活动，都可以在这里提问。深汕e仔会优先整理大家问得最多的问题，后面发成攻略。',
+        sort_weight: 180,
+    },
+];
+
 const AdminCompose = () => {
     const [form, setForm] = useState(initialForm);
     const [categories, setCategories] = useState([]);
@@ -33,6 +76,22 @@ const AdminCompose = () => {
 
     const update = (key, value) => {
         setForm((prev) => ({ ...prev, [key]: value }));
+    };
+
+    const applyTemplate = (template) => {
+        setForm((prev) => ({
+            ...prev,
+            ...template,
+            media_type: 'text',
+            images: '',
+            cover_url: '',
+            video_url: '',
+            is_official: true,
+            is_featured: true,
+            is_pinned: true,
+        }));
+        setMessage(`已填充模板：${template.name}`);
+        setError('');
     };
 
     const submit = async (event) => {
@@ -71,6 +130,13 @@ const AdminCompose = () => {
             <div className="admin-composer-grid">
                 <section className="admin-panel">
                     <h2>运营种子内容</h2>
+                    <div className="admin-template-row">
+                        {contentTemplates.map((template) => (
+                            <button className="admin-button" type="button" key={template.name} onClick={() => applyTemplate(template)}>
+                                {template.name}
+                            </button>
+                        ))}
+                    </div>
                     <div className="admin-form">
                         <div className="admin-field">
                             <label>标题</label>

@@ -3,6 +3,11 @@ import { campusAdminApi } from '../../api/admin';
 import './Admin.css';
 
 const statItems = [
+    ['今日访问', 'today_visits'],
+    ['累计访问', 'total_visits'],
+    ['今日分享', 'today_shares'],
+    ['累计分享', 'total_shares'],
+    ['今日登录', 'today_logins'],
     ['今日新增用户', 'today_users'],
     ['累计用户', 'total_users'],
     ['今日发帖', 'today_posts'],
@@ -45,6 +50,9 @@ const AdminDashboard = () => {
                         <thead>
                             <tr>
                                 <th>日期</th>
+                                <th>访问</th>
+                                <th>分享</th>
+                                <th>登录</th>
                                 <th>用户</th>
                                 <th>帖子</th>
                                 <th>评论</th>
@@ -57,6 +65,9 @@ const AdminDashboard = () => {
                             {(summary.trends || []).map((item) => (
                                 <tr key={item.date}>
                                     <td>{item.date}</td>
+                                    <td>{item.visits}</td>
+                                    <td>{item.shares}</td>
+                                    <td>{item.logins}</td>
                                     <td>{item.users}</td>
                                     <td>{item.posts}</td>
                                     <td>{item.comments}</td>
