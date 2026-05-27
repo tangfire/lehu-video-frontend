@@ -52,6 +52,7 @@ const AdminPosts = () => {
             audit_reason: post.audit_reason || '',
             is_official: post.is_official,
             is_featured: post.is_featured,
+            is_pinned: post.is_pinned,
             sort_weight: post.sort_weight || 0,
             ...patch,
         });
@@ -103,6 +104,7 @@ const AdminPosts = () => {
                                     <div className="admin-muted">{mediaTypeText(post.media_type)} · {post.category_name || post.category_code}</div>
                                 </td>
                                 <td>
+                                    {post.is_pinned && <span className="admin-tag warn">置顶</span>}{' '}
                                     {post.is_official && <span className="admin-tag">官方</span>}{' '}
                                     {post.is_featured && <span className="admin-tag warn">精选</span>}
                                     <div className="admin-muted">权重 {post.sort_weight || 0}</div>
@@ -114,6 +116,9 @@ const AdminPosts = () => {
                                     <div className="admin-actions">
                                         <button className="admin-button" onClick={() => updatePost(post, { is_featured: !post.is_featured })}>
                                             {post.is_featured ? '取消精选' : '设精选'}
+                                        </button>
+                                        <button className="admin-button" onClick={() => updatePost(post, { is_pinned: !post.is_pinned })}>
+                                            {post.is_pinned ? '取消置顶' : '设置顶'}
                                         </button>
                                         <button className="admin-button" onClick={() => updatePost(post, { is_official: !post.is_official })}>
                                             {post.is_official ? '取消官方' : '设官方'}

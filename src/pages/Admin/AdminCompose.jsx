@@ -14,6 +14,7 @@ const initialForm = {
     video_url: '',
     is_official: true,
     is_featured: true,
+    is_pinned: true,
     sort_weight: 100,
 };
 
@@ -51,6 +52,7 @@ const AdminCompose = () => {
                 video_url: form.video_url,
                 is_official: form.is_official,
                 is_featured: form.is_featured,
+                is_pinned: form.is_pinned,
                 sort_weight: Number(form.sort_weight || 0),
             });
             setMessage('已发布到小程序首页');
@@ -134,6 +136,10 @@ const AdminCompose = () => {
                             <label>
                                 <input type="checkbox" checked={form.is_featured} onChange={(e) => update('is_featured', e.target.checked)} />
                                 精选推荐
+                            </label>
+                            <label>
+                                <input type="checkbox" checked={form.is_pinned} onChange={(e) => update('is_pinned', e.target.checked)} />
+                                首页置顶
                             </label>
                         </div>
                         <button className="admin-button primary" disabled={loading}>{loading ? '发布中...' : '发布'}</button>
