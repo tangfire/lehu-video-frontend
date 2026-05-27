@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { FiFlag } from 'react-icons/fi';
 import { campusAdminApi } from '../../api/admin';
 import './Admin.css';
 
@@ -16,8 +17,11 @@ const AdminReports = () => {
     const [page, setPage] = useState(1);
     const [total, setTotal] = useState(0);
     const [error, setError] = useState('');
+    const [message, setMessage] = useState('');
+    const [loading, setLoading] = useState(false);
 
     const load = async (nextPage = page, nextStatus = status) => {
+        setLoading(true);
         setError('');
         try {
             const data = await campusAdminApi.listReports({ page: nextPage, size: 20, status: nextStatus });
@@ -26,6 +30,8 @@ const AdminReports = () => {
             setPage(nextPage);
         } catch (err) {
             setError(err.message || '获取举报失败');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -36,12 +42,19 @@ const AdminReports = () => {
     }, [statusParam]);
 
     const review = async (report, action) => {
-        await campusAdminApi.reviewReport(report.id, { action, reason: action === 'resolve' ? '已处理' : '已驳回' });
-        load(page);
+        try {
+            await campusAdminApi.reviewReport(report.id, { action, reason: action === 'resolve' ? '已处理' : '已驳回' });
+            setMessage(action === 'resolve' ? '举报已标记处理' : '举报已驳回');
+            window.setTimeout(() => setMessage(''), 2400);
+            load(page);
+        } catch (err) {
+            setError(err.message || '处理举报失败');
+        }
     };
 
     return (
         <>
+            {message && <div className="admin-toast success">{message}</div>}
             <div className="admin-toolbar">
                 <select className="admin-select" value={status} onChange={(e) => setStatus(e.target.value)}>
                     <option value="-1">全部举报</option>
@@ -52,7 +65,14 @@ const AdminReports = () => {
                 <button className="admin-button primary" onClick={() => load(1)}>查询</button>
             </div>
             {error && <div className="admin-error">{error}</div>}
-            <div className="admin-table-wrap">
+            {loading && <div className="admin-loading">举报加载中...</div>}
+            {!loading && reports.length === 0 && (
+                <div className="admin-empty">
+                    <FiFlag />
+                    <span>暂无举报事项</span>
+                </div>
+            )}
+            {!loading && reports.length > 0 && <div className="admin-table-wrap">
                 <table className="admin-table">
                     <thead>
                         <tr>
@@ -88,7 +108,7 @@ const AdminReports = () => {
                         ))}
                     </tbody>
                 </table>
-            </div>
+            </div>}
             <div className="admin-pagination">
                 <span className="admin-muted">共 {total} 条</span>
                 <button className="admin-button" disabled={page <= 1} onClick={() => load(page - 1)}>上一页</button>

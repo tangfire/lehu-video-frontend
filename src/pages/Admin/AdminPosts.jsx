@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { FiCheckCircle, FiImage, FiMoreHorizontal, FiSearch, FiTrash2, FiVideo } from 'react-icons/fi';
+import { FiCheckCircle, FiChevronDown, FiImage, FiMoreHorizontal, FiSearch, FiTrash2, FiVideo } from 'react-icons/fi';
 import { campusAdminApi } from '../../api/admin';
 import { compactNumber, excerpt, mediaTypeText, postCover, postTypeText, statusText } from './adminUtils';
 import './Admin.css';
@@ -79,6 +79,8 @@ const AdminPosts = () => {
     const [filters, setFilters] = useState({ ...initialFilters, status: initialStatus });
     const [selectedIds, setSelectedIds] = useState([]);
     const [weightValue, setWeightValue] = useState('100');
+    const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+    const [showBatchTools, setShowBatchTools] = useState(false);
     const [confirmAction, setConfirmAction] = useState(null);
     const [message, setMessage] = useState('');
     const [error, setError] = useState('');
@@ -195,18 +197,27 @@ const AdminPosts = () => {
                 <div className="admin-panel-head">
                     <div>
                         <h2>内容工作台</h2>
-                        <p>快速筛选官方内容、精选置顶和待审核内容，适合开学前批量运营。</p>
+                        <p>默认只处理最常用的搜索、审核、置顶和精选；高级筛选需要时再展开。</p>
                     </div>
                     <button className="admin-button primary" onClick={() => load(1)} disabled={loading}>
                         <FiSearch />
                         查询
                     </button>
                 </div>
-                <div className="admin-filter-grid">
+                <div className="admin-simple-filter-row">
                     <input className="admin-input" value={filters.keyword} onChange={(e) => updateFilter('keyword', e.target.value)} placeholder="搜索标题 / 正文" />
                     <select className="admin-select" value={filters.status} onChange={(e) => updateFilter('status', e.target.value)}>
                         {statusOptions.map(([label, value]) => <option key={value} value={value}>{label}</option>)}
                     </select>
+                    <button className={filters.opsFilter === 'pinned' ? 'admin-button active' : 'admin-button'} type="button" onClick={() => updateFilter('opsFilter', filters.opsFilter === 'pinned' ? '' : 'pinned')}>只看置顶</button>
+                    <button className={filters.opsFilter === 'featured' ? 'admin-button active' : 'admin-button'} type="button" onClick={() => updateFilter('opsFilter', filters.opsFilter === 'featured' ? '' : 'featured')}>只看精选</button>
+                    <button className="admin-button subtle" type="button" onClick={() => setShowAdvancedFilters((value) => !value)}>
+                        高级筛选
+                        <FiChevronDown className={showAdvancedFilters ? 'rotate' : ''} />
+                    </button>
+                </div>
+                {showAdvancedFilters && (
+                    <div className="admin-filter-grid advanced">
                     <select className="admin-select" value={filters.postType} onChange={(e) => updateFilter('postType', e.target.value)}>
                         {postTypeOptions.map(([label, value]) => <option key={value} value={value}>{label}</option>)}
                     </select>
@@ -217,7 +228,8 @@ const AdminPosts = () => {
                     <select className="admin-select" value={filters.opsFilter} onChange={(e) => updateFilter('opsFilter', e.target.value)}>
                         {opsOptions.map(([label, value]) => <option key={value} value={value}>{label}</option>)}
                     </select>
-                </div>
+                    </div>
+                )}
             </section>
 
             <section className="admin-batch-bar">
@@ -225,8 +237,19 @@ const AdminPosts = () => {
                     <input type="checkbox" checked={allCurrentSelected} onChange={toggleAllCurrent} />
                     已选 {selectedIds.length} 条
                 </label>
-                <div className="admin-batch-actions">
-                    {batchActions.map(([action, label]) => {
+                <div className="admin-batch-actions compact">
+                    <button className="admin-button" type="button" disabled={actionLoading || selectedIds.length === 0} onClick={() => runBatch('pin')}>置顶</button>
+                    <button className="admin-button" type="button" disabled={actionLoading || selectedIds.length === 0} onClick={() => runBatch('feature')}>精选</button>
+                    <button className="admin-button" type="button" disabled={actionLoading || selectedIds.length === 0} onClick={() => runBatch('visible')}>通过</button>
+                    <button className="admin-button subtle" type="button" onClick={() => setShowBatchTools((value) => !value)}>
+                        更多
+                        <FiChevronDown className={showBatchTools ? 'rotate' : ''} />
+                    </button>
+                </div>
+            </section>
+            {showBatchTools && (
+                <section className="admin-advanced-strip">
+                    {batchActions.filter(([action]) => !['pin', 'feature', 'visible'].includes(action)).map(([action, label]) => {
                         const needsConfirm = action === 'delete';
                         return (
                             <button
@@ -242,8 +265,8 @@ const AdminPosts = () => {
                     })}
                     <input className="admin-input mini" type="number" value={weightValue} onChange={(e) => setWeightValue(e.target.value)} />
                     <button className="admin-button" disabled={actionLoading || selectedIds.length === 0} onClick={() => runBatch('set_weight', { sort_weight: Number(weightValue || 0) })}>设权重</button>
-                </div>
-            </section>
+                </section>
+            )}
 
             <section className="admin-content-list">
                 {loading && <div className="admin-loading">内容加载中...</div>}
@@ -289,10 +312,10 @@ const AdminPosts = () => {
                         </div>
                         <div className="admin-post-ops">
                             <div className="admin-actions">
-                                <button className={post.is_pinned ? 'admin-button active' : 'admin-button'} disabled={actionLoading} onClick={() => updatePost(post, { is_pinned: !post.is_pinned })}>{post.is_pinned ? '已置顶' : '置顶'}</button>
-                                <button className={post.is_featured ? 'admin-button active' : 'admin-button'} disabled={actionLoading} onClick={() => updatePost(post, { is_featured: !post.is_featured })}>{post.is_featured ? '已精选' : '精选'}</button>
-                                <button className={post.is_official ? 'admin-button active' : 'admin-button'} disabled={actionLoading} onClick={() => updatePost(post, { is_official: !post.is_official })}>{post.is_official ? '官方' : '设官方'}</button>
+                                <button className={post.is_pinned ? 'admin-button active' : 'admin-button'} disabled={actionLoading} onClick={() => updatePost(post, { is_pinned: !post.is_pinned })}>{post.is_pinned ? '置顶中' : '置顶'}</button>
+                                <button className={post.is_featured ? 'admin-button active' : 'admin-button'} disabled={actionLoading} onClick={() => updatePost(post, { is_featured: !post.is_featured })}>{post.is_featured ? '精选中' : '精选'}</button>
                                 <button className="admin-button" disabled={actionLoading} onClick={() => updatePost(post, { status: 1, audit_reason: '' }, '内容已设为可见')}><FiCheckCircle /> 可见</button>
+                                <button className={post.is_official ? 'admin-button active quiet' : 'admin-button quiet'} disabled={actionLoading} onClick={() => updatePost(post, { is_official: !post.is_official })}>{post.is_official ? '官方' : '设官方'}</button>
                             </div>
                             <div className="admin-weight-editor">
                                 <input

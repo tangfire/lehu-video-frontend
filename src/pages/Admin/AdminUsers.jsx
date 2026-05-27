@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { FiUsers } from 'react-icons/fi';
 import { campusAdminApi } from '../../api/admin';
 import { roleText } from './adminUtils';
 import './Admin.css';
@@ -9,8 +10,11 @@ const AdminUsers = () => {
     const [page, setPage] = useState(1);
     const [total, setTotal] = useState(0);
     const [error, setError] = useState('');
+    const [message, setMessage] = useState('');
+    const [loading, setLoading] = useState(false);
 
     const load = async (nextPage = page) => {
+        setLoading(true);
         setError('');
         try {
             const data = await campusAdminApi.listUsers({ page: nextPage, size: 20, keyword });
@@ -19,6 +23,8 @@ const AdminUsers = () => {
             setPage(nextPage);
         } catch (err) {
             setError(err.message || '获取用户失败');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -28,18 +34,32 @@ const AdminUsers = () => {
     }, []);
 
     const setRole = async (item, role) => {
-        await campusAdminApi.updateUserRole(item.user.id, role);
-        load(page);
+        try {
+            await campusAdminApi.updateUserRole(item.user.id, role);
+            setMessage(`已更新为${roleText(role)}`);
+            window.setTimeout(() => setMessage(''), 2400);
+            load(page);
+        } catch (err) {
+            setError(err.message || '更新角色失败');
+        }
     };
 
     return (
         <>
+            {message && <div className="admin-toast success">{message}</div>}
             <div className="admin-toolbar">
                 <input className="admin-input" value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="搜索昵称、姓名、学号、手机号" />
                 <button className="admin-button primary" onClick={() => load(1)}>查询</button>
             </div>
             {error && <div className="admin-error">{error}</div>}
-            <div className="admin-table-wrap">
+            {loading && <div className="admin-loading">用户加载中...</div>}
+            {!loading && users.length === 0 && (
+                <div className="admin-empty">
+                    <FiUsers />
+                    <span>暂无匹配用户</span>
+                </div>
+            )}
+            {!loading && users.length > 0 && <div className="admin-table-wrap">
                 <table className="admin-table">
                     <thead>
                         <tr>
@@ -74,7 +94,7 @@ const AdminUsers = () => {
                         ))}
                     </tbody>
                 </table>
-            </div>
+            </div>}
             <div className="admin-pagination">
                 <span className="admin-muted">共 {total} 条</span>
                 <button className="admin-button" disabled={page <= 1} onClick={() => load(page - 1)}>上一页</button>

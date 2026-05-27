@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { FiMessageCircle, FiTrash2 } from 'react-icons/fi';
 import { campusAdminApi } from '../../api/admin';
 import { statusText } from './adminUtils';
 import './Admin.css';
@@ -12,8 +13,12 @@ const AdminComments = () => {
     const [page, setPage] = useState(1);
     const [total, setTotal] = useState(0);
     const [error, setError] = useState('');
+    const [message, setMessage] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [pendingDelete, setPendingDelete] = useState(null);
 
     const load = async (nextPage = page, nextStatus = status) => {
+        setLoading(true);
         setError('');
         try {
             const data = await campusAdminApi.listComments({ page: nextPage, size: 20, status: nextStatus });
@@ -22,6 +27,8 @@ const AdminComments = () => {
             setPage(nextPage);
         } catch (err) {
             setError(err.message || '获取评论失败');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -31,14 +38,26 @@ const AdminComments = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [statusParam]);
 
-    const remove = async (comment) => {
-        if (!window.confirm('确认删除这条评论吗？')) return;
-        await campusAdminApi.deleteComment(comment.id);
-        load(page);
+    const showMessage = (text) => {
+        setMessage(text);
+        window.setTimeout(() => setMessage(''), 2400);
+    };
+
+    const remove = async () => {
+        if (!pendingDelete) return;
+        try {
+            await campusAdminApi.deleteComment(pendingDelete.id);
+            setPendingDelete(null);
+            showMessage('评论已删除');
+            load(page);
+        } catch (err) {
+            setError(err.message || '删除评论失败');
+        }
     };
 
     return (
         <>
+            {message && <div className="admin-toast success">{message}</div>}
             <div className="admin-toolbar">
                 <select className="admin-select" value={status} onChange={(e) => setStatus(e.target.value)}>
                     <option value="-1">全部状态</option>
@@ -50,7 +69,14 @@ const AdminComments = () => {
                 <button className="admin-button primary" onClick={() => load(1)}>查询</button>
             </div>
             {error && <div className="admin-error">{error}</div>}
-            <div className="admin-table-wrap">
+            {loading && <div className="admin-loading">评论加载中...</div>}
+            {!loading && comments.length === 0 && (
+                <div className="admin-empty">
+                    <FiMessageCircle />
+                    <span>暂无评论数据</span>
+                </div>
+            )}
+            {!loading && comments.length > 0 && <div className="admin-table-wrap">
                 <table className="admin-table">
                     <thead>
                         <tr>
@@ -71,18 +97,31 @@ const AdminComments = () => {
                                 <td>{statusText(comment.status)}</td>
                                 <td>{comment.created_at}</td>
                                 <td>
-                                    <button className="admin-button danger" onClick={() => remove(comment)}>删除</button>
+                                    <button className="admin-button danger" onClick={() => setPendingDelete(comment)}><FiTrash2 /> 删除</button>
                                 </td>
                             </tr>
                         ))}
                     </tbody>
                 </table>
-            </div>
+            </div>}
             <div className="admin-pagination">
                 <span className="admin-muted">共 {total} 条</span>
                 <button className="admin-button" disabled={page <= 1} onClick={() => load(page - 1)}>上一页</button>
                 <button className="admin-button" disabled={page * 20 >= total} onClick={() => load(page + 1)}>下一页</button>
             </div>
+            {pendingDelete && (
+                <div className="admin-modal-backdrop" role="presentation">
+                    <div className="admin-confirm-modal">
+                        <div className="admin-modal-icon"><FiTrash2 /></div>
+                        <h3>删除评论</h3>
+                        <p>确认删除这条评论吗？删除后前台将不再展示。</p>
+                        <div className="admin-modal-actions">
+                            <button className="admin-button" onClick={() => setPendingDelete(null)}>取消</button>
+                            <button className="admin-button danger" onClick={remove}>确认删除</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 };

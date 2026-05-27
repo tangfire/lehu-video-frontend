@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { FiCheck, FiImage, FiPlus, FiSend, FiUploadCloud, FiVideo, FiX } from 'react-icons/fi';
+import { FiCheck, FiChevronDown, FiImage, FiPlus, FiSend, FiUploadCloud, FiVideo, FiX } from 'react-icons/fi';
 import { campusAdminApi } from '../../api/admin';
 import { excerpt, postTypeText, toArrayFromLines } from './adminUtils';
 import './Admin.css';
@@ -74,6 +74,7 @@ const AdminCompose = () => {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
+    const [showAdvanced, setShowAdvanced] = useState(false);
     const fileInputRef = useRef(null);
 
     useEffect(() => {
@@ -180,12 +181,12 @@ const AdminCompose = () => {
         <form className="admin-compose-page" onSubmit={submit}>
             {message && <div className="admin-toast success">{message}</div>}
             {error && <div className="admin-error">{error}</div>}
-            <div className="admin-composer-grid">
+            <div className="admin-composer-grid simple">
                 <section className="admin-panel">
                     <div className="admin-panel-head">
                         <div>
-                            <h2>运营发帖</h2>
-                            <p>用深汕e仔官方号快速发布攻略、问答和社团招新内容。</p>
+                            <h2>发一篇深汕e仔官方帖</h2>
+                            <p>先选模板，再改标题正文，配图后直接发布。</p>
                         </div>
                         <button className="admin-button primary" disabled={loading || uploading}>
                             <FiSend />
@@ -193,6 +194,7 @@ const AdminCompose = () => {
                         </button>
                     </div>
 
+                    <div className="admin-step-title">1. 选一个模板</div>
                     <div className="admin-template-grid">
                         {contentTemplates.map((template) => (
                             <button className="admin-template-card" type="button" key={template.name} onClick={() => applyTemplate(template)}>
@@ -203,7 +205,8 @@ const AdminCompose = () => {
                         ))}
                     </div>
 
-                    <div className="admin-form two">
+                    <div className="admin-step-title">2. 改成今天要发的内容</div>
+                    <div className="admin-form simple-compose">
                         <div className="admin-field wide">
                             <label>标题</label>
                             <input className="admin-input" value={form.title} onChange={(e) => update('title', e.target.value)} maxLength={60} placeholder="建议 18-32 字，像小红书笔记标题一样直接有用" />
@@ -212,44 +215,13 @@ const AdminCompose = () => {
                             <label>正文</label>
                             <textarea className="admin-textarea tall" value={form.content} onChange={(e) => update('content', e.target.value)} maxLength={2000} placeholder="把最重要的信息放在前两行，方便首页卡片抓住新生注意力。" />
                         </div>
-                        <div className="admin-field">
-                            <label>版块</label>
-                            <select className="admin-select" value={form.category_code} onChange={(e) => update('category_code', e.target.value)}>
-                                {categories.length === 0 && <option value="guide">校园攻略</option>}
-                                {categories.map((item) => (
-                                    <option key={item.code} value={item.code}>{item.name}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="admin-field">
-                            <label>笔记类型</label>
-                            <select className="admin-select" value={form.post_type} onChange={(e) => update('post_type', e.target.value)}>
-                                <option value="guide">攻略</option>
-                                <option value="question">问答</option>
-                                <option value="lost">失物招领</option>
-                                <option value="club">社团</option>
-                                <option value="note">普通笔记</option>
-                            </select>
-                        </div>
-                        <div className="admin-field">
-                            <label>媒体类型</label>
-                            <select className="admin-select" value={form.media_type} onChange={(e) => update('media_type', e.target.value)}>
-                                <option value="text">纯文字</option>
-                                <option value="image">图文</option>
-                                <option value="video">视频</option>
-                            </select>
-                        </div>
-                        <div className="admin-field">
-                            <label>排序权重</label>
-                            <input className="admin-input" type="number" value={form.sort_weight} onChange={(e) => update('sort_weight', e.target.value)} />
-                        </div>
                     </div>
 
                     <div className="admin-upload-panel">
                         <div className="admin-upload-head">
                             <div>
-                                <h3>图片素材</h3>
-                                <p>可直接上传图片，第一张默认作为首页封面。</p>
+                                <h3>3. 配图</h3>
+                                <p>第一张会自动成为首页封面，没有图也可以发布文字笔记。</p>
                             </div>
                             <button className="admin-button" type="button" disabled={uploading || images.length >= 9} onClick={() => fileInputRef.current?.click()}>
                                 <FiUploadCloud />
@@ -274,38 +246,66 @@ const AdminCompose = () => {
                         </div>
                     </div>
 
-                    <div className="admin-form two">
-                        <div className="admin-field">
-                            <label>封面 URL</label>
-                            <input className="admin-input" value={form.cover_url} onChange={(e) => update('cover_url', e.target.value)} placeholder="为空时自动取第一张图片" />
+                    <button className="admin-advanced-toggle" type="button" onClick={() => setShowAdvanced((value) => !value)}>
+                        高级发布设置
+                        <FiChevronDown className={showAdvanced ? 'rotate' : ''} />
+                    </button>
+                    {showAdvanced && (
+                        <div className="admin-advanced-box">
+                            <div className="admin-form two">
+                                <div className="admin-field">
+                                    <label>版块</label>
+                                    <select className="admin-select" value={form.category_code} onChange={(e) => update('category_code', e.target.value)}>
+                                        {categories.length === 0 && <option value="guide">校园攻略</option>}
+                                        {categories.map((item) => (
+                                            <option key={item.code} value={item.code}>{item.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="admin-field">
+                                    <label>笔记类型</label>
+                                    <select className="admin-select" value={form.post_type} onChange={(e) => update('post_type', e.target.value)}>
+                                        <option value="guide">攻略</option>
+                                        <option value="question">问答</option>
+                                        <option value="lost">失物招领</option>
+                                        <option value="club">社团</option>
+                                        <option value="note">普通笔记</option>
+                                    </select>
+                                </div>
+                                <div className="admin-field">
+                                    <label>媒体类型</label>
+                                    <select className="admin-select" value={form.media_type} onChange={(e) => update('media_type', e.target.value)}>
+                                        <option value="text">纯文字</option>
+                                        <option value="image">图文</option>
+                                        <option value="video">视频</option>
+                                    </select>
+                                </div>
+                                <div className="admin-field">
+                                    <label>排序权重</label>
+                                    <input className="admin-input" type="number" value={form.sort_weight} onChange={(e) => update('sort_weight', e.target.value)} />
+                                </div>
+                                <div className="admin-field">
+                                    <label>封面 URL</label>
+                                    <input className="admin-input" value={form.cover_url} onChange={(e) => update('cover_url', e.target.value)} placeholder="为空时自动取第一张图片" />
+                                </div>
+                                <div className="admin-field">
+                                    <label>视频 URL</label>
+                                    <input className="admin-input" value={form.video_url} onChange={(e) => update('video_url', e.target.value)} placeholder="视频内容先填写 URL" />
+                                </div>
+                            </div>
                         </div>
-                        <div className="admin-field">
-                            <label>视频 URL</label>
-                            <input className="admin-input" value={form.video_url} onChange={(e) => update('video_url', e.target.value)} placeholder="视频内容先填写 URL，后台暂不上传大视频" />
-                        </div>
-                    </div>
+                    )}
                 </section>
 
                 <aside className="admin-compose-aside">
                     <section className="admin-panel">
-                        <h2>发布设置</h2>
-                        <div className="admin-switch-list">
-                            <label>
-                                <input type="checkbox" checked={form.is_official} onChange={(e) => update('is_official', e.target.checked)} />
-                                <span>官方标识</span>
-                                <em>显示“深汕e仔 / 官方”</em>
-                            </label>
-                            <label>
-                                <input type="checkbox" checked={form.is_featured} onChange={(e) => update('is_featured', e.target.checked)} />
-                                <span>精选推荐</span>
-                                <em>提升推荐排序</em>
-                            </label>
-                            <label>
-                                <input type="checkbox" checked={form.is_pinned} onChange={(e) => update('is_pinned', e.target.checked)} />
-                                <span>首页置顶</span>
-                                <em>适合报到总攻略</em>
-                            </label>
+                        <h2>默认发布方式</h2>
+                        <div className="admin-simple-switch-row">
+                            <button className={form.is_official ? 'admin-pill active' : 'admin-pill'} type="button" onClick={() => update('is_official', !form.is_official)}>官方</button>
+                            <button className={form.is_featured ? 'admin-pill active' : 'admin-pill'} type="button" onClick={() => update('is_featured', !form.is_featured)}>精选</button>
+                            <button className={form.is_pinned ? 'admin-pill active' : 'admin-pill'} type="button" onClick={() => update('is_pinned', !form.is_pinned)}>置顶</button>
                         </div>
+                        <p className="admin-muted">默认三项都开，适合开学前官方攻略。普通公告可以关掉置顶。</p>
                     </section>
 
                     <section className="admin-preview-panel">
