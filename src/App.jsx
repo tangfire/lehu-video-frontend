@@ -30,6 +30,7 @@ import AdminComments from './pages/Admin/AdminComments.jsx';
 import AdminReports from './pages/Admin/AdminReports.jsx';
 import AdminUsers from './pages/Admin/AdminUsers.jsx';
 import AdminFeedback from './pages/Admin/AdminFeedback.jsx';
+import AdminSecurity from './pages/Admin/AdminSecurity.jsx';
 
 function App() {
     return (
@@ -111,6 +112,7 @@ function App() {
                             <Route path="comments" element={<AdminComments />} />
                             <Route path="reports" element={<AdminReports />} />
                             <Route path="feedback" element={<AdminFeedback />} />
+                            <Route path="security" element={<AdminSecurity />} />
                             <Route path="users" element={<AdminUsers />} />
                         </Route>
                         <Route path="*" element={<Navigate to="/" replace />} />
