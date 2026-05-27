@@ -29,6 +29,7 @@ const opsOptions = [
     ['官方内容', 'official'],
     ['精选内容', 'featured'],
     ['置顶内容', 'pinned'],
+    ['有待处理举报', 'reported'],
 ];
 
 const statusOptions = [
@@ -211,6 +212,7 @@ const AdminPosts = () => {
                     </select>
                     <button className={filters.opsFilter === 'pinned' ? 'admin-button active' : 'admin-button'} type="button" onClick={() => updateFilter('opsFilter', filters.opsFilter === 'pinned' ? '' : 'pinned')}>只看置顶</button>
                     <button className={filters.opsFilter === 'featured' ? 'admin-button active' : 'admin-button'} type="button" onClick={() => updateFilter('opsFilter', filters.opsFilter === 'featured' ? '' : 'featured')}>只看精选</button>
+                    <button className={filters.opsFilter === 'reported' ? 'admin-button active' : 'admin-button'} type="button" onClick={() => updateFilter('opsFilter', filters.opsFilter === 'reported' ? '' : 'reported')}>有举报</button>
                     <button className="admin-button subtle" type="button" onClick={() => setShowAdvancedFilters((value) => !value)}>
                         高级筛选
                         <FiChevronDown className={showAdvancedFilters ? 'rotate' : ''} />
@@ -218,16 +220,16 @@ const AdminPosts = () => {
                 </div>
                 {showAdvancedFilters && (
                     <div className="admin-filter-grid advanced">
-                    <select className="admin-select" value={filters.postType} onChange={(e) => updateFilter('postType', e.target.value)}>
-                        {postTypeOptions.map(([label, value]) => <option key={value} value={value}>{label}</option>)}
-                    </select>
-                    <select className="admin-select" value={filters.categoryCode} onChange={(e) => updateFilter('categoryCode', e.target.value)}>
-                        <option value="">全部版块</option>
-                        {categories.map((item) => <option key={item.code} value={item.code}>{item.name}</option>)}
-                    </select>
-                    <select className="admin-select" value={filters.opsFilter} onChange={(e) => updateFilter('opsFilter', e.target.value)}>
-                        {opsOptions.map(([label, value]) => <option key={value} value={value}>{label}</option>)}
-                    </select>
+                        <select className="admin-select" value={filters.postType} onChange={(e) => updateFilter('postType', e.target.value)}>
+                            {postTypeOptions.map(([label, value]) => <option key={value} value={value}>{label}</option>)}
+                        </select>
+                        <select className="admin-select" value={filters.categoryCode} onChange={(e) => updateFilter('categoryCode', e.target.value)}>
+                            <option value="">全部版块</option>
+                            {categories.map((item) => <option key={item.code} value={item.code}>{item.name}</option>)}
+                        </select>
+                        <select className="admin-select" value={filters.opsFilter} onChange={(e) => updateFilter('opsFilter', e.target.value)}>
+                            {opsOptions.map(([label, value]) => <option key={value} value={value}>{label}</option>)}
+                        </select>
                     </div>
                 )}
             </section>

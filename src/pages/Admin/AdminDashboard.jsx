@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FiArrowRight, FiEdit3, FiFileText, FiFlag, FiMessageCircle, FiSend, FiStar } from 'react-icons/fi';
 import { campusAdminApi } from '../../api/admin';
-import { compactNumber, excerpt, postCover, postTypeText } from './adminUtils';
+import { compactNumber, excerpt, postCover, postTypeText, ratioText } from './adminUtils';
 import './Admin.css';
 
 const AdminDashboard = () => {
@@ -37,6 +37,8 @@ const AdminDashboard = () => {
             { label: '今日访问', value: summary.today_visits || 0, hint: `累计 ${compactNumber(summary.total_visits)}` },
             { label: '今日登录', value: summary.today_logins || 0, hint: `新增用户 ${compactNumber(summary.today_users)}` },
             { label: '今日互动', value: todayInteraction, hint: '评论 / 点赞 / 收藏' },
+            { label: '发布转化', value: ratioText(summary.today_publish_done, summary.today_publish_open), hint: `${compactNumber(summary.today_publish_open)} 次打开发布` },
+            { label: '详情访问', value: summary.today_detail_views || 0, hint: '今日帖子详情' },
             { label: '待处理', value: pending, hint: '反馈 / 举报 / 审核' },
         ];
     }, [summary]);
@@ -92,6 +94,25 @@ const AdminDashboard = () => {
                         <em>{item.hint}</em>
                     </div>
                 ))}
+            </section>
+
+            <section className="admin-funnel-strip">
+                <div>
+                    <span>发布成功</span>
+                    <strong>{compactNumber(summary.today_publish_done)}</strong>
+                </div>
+                <div>
+                    <span>今日分享</span>
+                    <strong>{compactNumber(summary.today_shares)}</strong>
+                </div>
+                <div>
+                    <span>用户反馈</span>
+                    <strong>{compactNumber(summary.today_feedback)}</strong>
+                </div>
+                <div>
+                    <span>新增举报</span>
+                    <strong>{compactNumber(summary.today_reports)}</strong>
+                </div>
             </section>
 
             <section className="admin-two-column simple">

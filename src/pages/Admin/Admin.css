@@ -350,7 +350,7 @@
 
 .admin-key-grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 12px;
 }
 
@@ -372,8 +372,32 @@
 .admin-key-stat strong {
     display: block;
     margin: 8px 0 4px;
-    font-size: 30px;
+    font-size: 28px;
     line-height: 1;
+}
+
+.admin-funnel-strip {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.admin-funnel-strip div {
+    padding: 14px 16px;
+    border: 1px solid var(--admin-line);
+    border-radius: 8px;
+    background: #fff;
+}
+
+.admin-funnel-strip span {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--admin-muted);
+    font-size: 13px;
+}
+
+.admin-funnel-strip strong {
+    font-size: 22px;
 }
 
 .admin-panel {
@@ -653,7 +677,7 @@
 
 .admin-simple-filter-row {
     display: grid;
-    grid-template-columns: minmax(260px, 1fr) 150px auto auto auto;
+    grid-template-columns: minmax(260px, 1fr) 150px auto auto auto auto;
     gap: 10px;
     align-items: center;
 }

@@ -55,6 +55,12 @@ export const percentText = (numerator, denominator) => {
     return `${Math.round((Number(numerator || 0) / total) * 100)}%`;
 };
 
+export const ratioText = (numerator, denominator) => {
+    const total = Number(denominator || 0);
+    if (total <= 0) return '0%';
+    return `${Math.round((Number(numerator || 0) / total) * 100)}%`;
+};
+
 export const postCover = (post) => post?.cover_url || post?.images?.[0] || '';
 
 export const excerpt = (value, max = 72) => {
