@@ -29,6 +29,7 @@ import AdminCompose from './pages/Admin/AdminCompose.jsx';
 import AdminComments from './pages/Admin/AdminComments.jsx';
 import AdminReports from './pages/Admin/AdminReports.jsx';
 import AdminUsers from './pages/Admin/AdminUsers.jsx';
+import AdminFeedback from './pages/Admin/AdminFeedback.jsx';
 
 function App() {
     return (
@@ -109,6 +110,7 @@ function App() {
                             <Route path="compose" element={<AdminCompose />} />
                             <Route path="comments" element={<AdminComments />} />
                             <Route path="reports" element={<AdminReports />} />
+                            <Route path="feedback" element={<AdminFeedback />} />
                             <Route path="users" element={<AdminUsers />} />
                         </Route>
                         <Route path="*" element={<Navigate to="/" replace />} />

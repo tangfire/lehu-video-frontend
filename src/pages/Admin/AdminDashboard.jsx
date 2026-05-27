@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { FiArrowRight, FiEdit3, FiFileText, FiFlag, FiMessageCircle, FiStar } from 'react-icons/fi';
+import { FiArrowRight, FiEdit3, FiFileText, FiFlag, FiMessageCircle, FiSend, FiStar } from 'react-icons/fi';
 import { campusAdminApi } from '../../api/admin';
 import { compactNumber, excerpt, postCover, postTypeText } from './adminUtils';
 import './Admin.css';
@@ -32,12 +32,12 @@ const AdminDashboard = () => {
     const keyStats = useMemo(() => {
         if (!summary) return [];
         const todayInteraction = Number(summary.today_comments || 0) + Number(summary.today_likes || 0) + Number(summary.today_collections || 0);
-        const pending = Number(summary.pending_reports || 0) + Number(summary.pending_posts || 0) + Number(summary.pending_comments || 0);
+        const pending = Number(summary.pending_reports || 0) + Number(summary.pending_posts || 0) + Number(summary.pending_comments || 0) + Number(summary.pending_feedback || 0);
         return [
             { label: '今日访问', value: summary.today_visits || 0, hint: `累计 ${compactNumber(summary.total_visits)}` },
             { label: '今日登录', value: summary.today_logins || 0, hint: `新增用户 ${compactNumber(summary.today_users)}` },
             { label: '今日互动', value: todayInteraction, hint: '评论 / 点赞 / 收藏' },
-            { label: '待处理', value: pending, hint: '举报和待审核内容' },
+            { label: '待处理', value: pending, hint: '反馈 / 举报 / 审核' },
         ];
     }, [summary]);
 
@@ -46,6 +46,9 @@ const AdminDashboard = () => {
         const items = [];
         if (Number(summary.pending_reports || 0) > 0) {
             items.push({ icon: <FiFlag />, title: '处理举报', detail: `${summary.pending_reports} 条举报等待处理`, to: '/admin/reports?status=0' });
+        }
+        if (Number(summary.pending_feedback || 0) > 0) {
+            items.push({ icon: <FiSend />, title: '回复用户反馈', detail: `${summary.pending_feedback} 条反馈等待跟进`, to: '/admin/feedback?status=0' });
         }
         if (Number(summary.pending_posts || 0) > 0) {
             items.push({ icon: <FiFileText />, title: '审核帖子', detail: `${summary.pending_posts} 篇帖子待审核`, to: '/admin/posts?status=0' });
