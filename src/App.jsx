@@ -21,6 +21,14 @@ import Collections from './pages/Collection/Collections';
 import AuthRoute from './components/AuthRoute';    // 确保 AuthRoute 正确导出
 import './App.css';
 import SearchPage from "./pages/Search/index.jsx";
+import AdminLogin from './pages/Admin/AdminLogin.jsx';
+import AdminLayout from './pages/Admin/AdminLayout.jsx';
+import AdminDashboard from './pages/Admin/AdminDashboard.jsx';
+import AdminPosts from './pages/Admin/AdminPosts.jsx';
+import AdminCompose from './pages/Admin/AdminCompose.jsx';
+import AdminComments from './pages/Admin/AdminComments.jsx';
+import AdminReports from './pages/Admin/AdminReports.jsx';
+import AdminUsers from './pages/Admin/AdminUsers.jsx';
 
 function App() {
     return (
@@ -94,6 +102,15 @@ function App() {
                         </Route>
                         <Route path="/login" element={<Login />} />
                         <Route path="/register" element={<Register />} />
+                        <Route path="/admin/login" element={<AdminLogin />} />
+                        <Route path="/admin" element={<AdminLayout />}>
+                            <Route index element={<AdminDashboard />} />
+                            <Route path="posts" element={<AdminPosts />} />
+                            <Route path="compose" element={<AdminCompose />} />
+                            <Route path="comments" element={<AdminComments />} />
+                            <Route path="reports" element={<AdminReports />} />
+                            <Route path="users" element={<AdminUsers />} />
+                        </Route>
                         <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>
                 </WebSocketProvider>
