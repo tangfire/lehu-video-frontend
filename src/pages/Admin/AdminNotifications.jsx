@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FiBell, FiSend } from 'react-icons/fi';
+import { FiAlertTriangle, FiBell, FiSend } from 'react-icons/fi';
 import { campusAdminApi } from '../../api/admin';
 import './Admin.css';
 
@@ -43,6 +43,8 @@ const AdminNotifications = () => {
     const [message, setMessage] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [confirmOpen, setConfirmOpen] = useState(false);
+    const [confirmText, setConfirmText] = useState('');
 
     const update = (key, value) => {
         setNotice((prev) => ({ ...prev, [key]: value }));
@@ -59,14 +61,31 @@ const AdminNotifications = () => {
         setError('');
     };
 
-    const submit = async () => {
+    const validateNotice = () => {
         if (loading) return;
         if (!notice.title.trim() || !notice.content.trim()) {
             setError('请先填写通知标题和内容');
-            return;
+            return false;
         }
         if (notice.link_page === 'post-detail' && !String(notice.link_params || '').trim()) {
             setError('跳转到指定帖子时需要填写帖子 ID');
+            return false;
+        }
+        return true;
+    };
+
+    const openConfirm = () => {
+        if (!validateNotice()) return;
+        setError('');
+        setMessage('');
+        setConfirmText('');
+        setConfirmOpen(true);
+    };
+
+    const submit = async () => {
+        if (!validateNotice()) return;
+        if (notice.audience === 'all_users' && confirmText.trim() !== '发送') {
+            setError('请输入“发送”确认本次全量通知');
             return;
         }
         setLoading(true);
@@ -83,6 +102,8 @@ const AdminNotifications = () => {
             const taskId = res?.task_id ? `，任务ID：${res.task_id}` : '';
             setMessage(`系统通知已加入可靠发送任务${taskId}`);
             setNotice(initialNotice);
+            setConfirmOpen(false);
+            setConfirmText('');
         } catch (err) {
             setError(err.message || '系统通知发送失败');
         } finally {
@@ -101,9 +122,9 @@ const AdminNotifications = () => {
                             <h2>发布系统通知</h2>
                             <p>用于内测公告、维护提醒、活动提醒，会出现在小程序“我的 - 消息中心”。</p>
                         </div>
-                        <button className="admin-button primary" type="button" disabled={loading} onClick={submit}>
+                        <button className="admin-button primary" type="button" disabled={loading} onClick={openConfirm}>
                             <FiSend />
-                            {loading ? '发送中...' : '发送给全部用户'}
+                            发送给全部用户
                         </button>
                     </div>
 
@@ -173,6 +194,31 @@ const AdminNotifications = () => {
                     </section>
                 </aside>
             </div>
+
+            {confirmOpen && (
+                <div className="admin-modal-backdrop" role="presentation">
+                    <div className="admin-confirm-modal">
+                        <div className="admin-modal-icon danger"><FiAlertTriangle /></div>
+                        <h3>确认发送给全部用户？</h3>
+                        <p>这条通知会进入所有用户的小程序消息中心。发送任务创建后不能一键撤回，请确认标题、正文和跳转入口无误。</p>
+                        <div className="admin-confirm-preview">
+                            <strong>{notice.title}</strong>
+                            <span>{notice.content}</span>
+                            <em>点击打开：{linkPageText(notice.link_page)}</em>
+                        </div>
+                        <label className="admin-confirm-input">
+                            输入“发送”确认
+                            <input className="admin-input" value={confirmText} onChange={(e) => setConfirmText(e.target.value)} placeholder="发送" autoFocus />
+                        </label>
+                        <div className="admin-modal-actions">
+                            <button className="admin-button" disabled={loading} onClick={() => setConfirmOpen(false)}>取消</button>
+                            <button className="admin-button danger" disabled={loading || confirmText.trim() !== '发送'} onClick={submit}>
+                                {loading ? '加入任务中...' : '确认发送'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

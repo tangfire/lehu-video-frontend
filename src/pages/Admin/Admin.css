@@ -2247,6 +2247,11 @@
     color: var(--admin-primary);
 }
 
+.admin-modal-icon.danger {
+    background: #fef2f2;
+    color: var(--admin-danger);
+}
+
 .admin-confirm-modal h3 {
     margin: 0 0 8px;
 }
@@ -2264,6 +2269,44 @@
     background: #fff7ed;
     color: #9a3412 !important;
     font-weight: 800;
+    text-align: left;
+}
+
+.admin-confirm-preview {
+    display: grid;
+    gap: 6px;
+    margin-top: 14px;
+    padding: 12px;
+    border: 1px solid var(--admin-line);
+    border-radius: 8px;
+    background: #fbfaf9;
+    text-align: left;
+}
+
+.admin-confirm-preview strong,
+.admin-confirm-preview span,
+.admin-confirm-preview em {
+    display: block;
+}
+
+.admin-confirm-preview span {
+    color: var(--admin-text);
+    line-height: 1.55;
+}
+
+.admin-confirm-preview em {
+    color: var(--admin-muted);
+    font-size: 12px;
+    font-style: normal;
+}
+
+.admin-confirm-input {
+    display: grid;
+    gap: 7px;
+    margin-top: 14px;
+    color: #475569;
+    font-size: 13px;
+    font-weight: 900;
     text-align: left;
 }
 

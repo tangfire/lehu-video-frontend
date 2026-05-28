@@ -242,9 +242,9 @@ const AdminPosts = () => {
                     已选 {selectedIds.length} 条
                 </label>
                 <div className="admin-batch-actions compact">
-                    <button className="admin-button" type="button" disabled={actionLoading || selectedIds.length === 0} onClick={() => runBatch('pin')}>置顶</button>
-                    <button className="admin-button" type="button" disabled={actionLoading || selectedIds.length === 0} onClick={() => runBatch('feature')}>精选</button>
-                    <button className="admin-button" type="button" disabled={actionLoading || selectedIds.length === 0} onClick={() => runBatch('visible')}>恢复可见</button>
+                    <button className="admin-button" type="button" disabled={actionLoading || selectedIds.length === 0} onClick={() => setConfirmAction({ type: 'batch', action: 'pin', label: '批量置顶' })}>置顶</button>
+                    <button className="admin-button" type="button" disabled={actionLoading || selectedIds.length === 0} onClick={() => setConfirmAction({ type: 'batch', action: 'feature', label: '设为精选' })}>精选</button>
+                    <button className="admin-button" type="button" disabled={actionLoading || selectedIds.length === 0} onClick={() => setConfirmAction({ type: 'batch', action: 'visible', label: '恢复可见' })}>恢复可见</button>
                     <button className="admin-button subtle" type="button" onClick={() => setShowBatchTools((value) => !value)}>
                         更多
                         <FiChevronDown className={showBatchTools ? 'rotate' : ''} />
@@ -261,14 +261,14 @@ const AdminPosts = () => {
                                 type="button"
                                 key={action}
                                 disabled={actionLoading || selectedIds.length === 0}
-                                onClick={() => needsConfirm ? setConfirmAction({ type: 'batch', action, label }) : runBatch(action)}
+                                onClick={() => needsConfirm ? setConfirmAction({ type: 'batch', action, label }) : setConfirmAction({ type: 'batch', action, label })}
                             >
                                 {label}
                             </button>
                         );
                     })}
                     <input className="admin-input mini" type="number" value={weightValue} onChange={(e) => setWeightValue(e.target.value)} />
-                    <button className="admin-button" disabled={actionLoading || selectedIds.length === 0} onClick={() => runBatch('set_weight', { sort_weight: Number(weightValue || 0) })}>设权重</button>
+                    <button className="admin-button" disabled={actionLoading || selectedIds.length === 0} onClick={() => setConfirmAction({ type: 'batch', action: 'set_weight', label: `设权重为 ${Number(weightValue || 0)}`, extra: { sort_weight: Number(weightValue || 0) } })}>设权重</button>
                 </section>
             )}
 
@@ -363,7 +363,7 @@ const AdminPosts = () => {
                         <h3>{confirmAction.label}</h3>
                         <p>
                             {confirmAction.type === 'batch'
-                                ? `将对 ${selectedIds.length} 条内容执行「${confirmAction.label}」，操作后小程序首页会同步变化。`
+                                ? `将对 ${selectedIds.length} 条内容执行「${confirmAction.label}」。涉及置顶、精选、官方、权重或恢复可见时，会影响小程序首页曝光。`
                                 : `确认下架「${confirmAction.post?.title || '这条内容'}」吗？下架后前台不再展示，可通过「恢复可见」重新上架。`}
                         </p>
                         <div className="admin-modal-actions">
@@ -373,7 +373,7 @@ const AdminPosts = () => {
                                 disabled={actionLoading}
                                 onClick={() => {
                                     if (confirmAction.type === 'batch') {
-                                        runBatch(confirmAction.action);
+                                        runBatch(confirmAction.action, confirmAction.extra || {});
                                     } else {
                                         updatePost(confirmAction.post, { status: 3, audit_reason: '运营下架' }, '内容已下架');
                                         setConfirmAction(null);

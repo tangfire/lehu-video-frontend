@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { FiShield } from 'react-icons/fi';
+import { FiAlertTriangle, FiShield } from 'react-icons/fi';
 import { campusAdminApi } from '../../api/admin';
 import { compactNumber } from './adminUtils';
 import './Admin.css';
@@ -11,6 +11,7 @@ const AdminSecurity = () => {
     const [error, setError] = useState('');
     const [message, setMessage] = useState('');
     const [loading, setLoading] = useState(false);
+    const [confirmAction, setConfirmAction] = useState(null);
 
     const load = async () => {
         setLoading(true);
@@ -40,17 +41,28 @@ const AdminSecurity = () => {
         ];
     }, [security]);
 
-    const submitBlock = async () => {
+    const openBlockConfirm = () => {
         const ip = blockIP.trim();
         if (!ip) {
             setError('请输入要封禁的 IP');
             return;
         }
+        setError('');
+        setConfirmAction({ type: 'block', ip, reason: reason.trim() || '后台手动封禁' });
+    };
+
+    const submitBlock = async () => {
+        const ip = confirmAction?.ip || blockIP.trim();
+        if (!ip) {
+            setError('请输入要封禁的 IP');
+            return;
+        }
         try {
-            await campusAdminApi.blockIP({ ip, reason: reason.trim() || '后台手动封禁' });
+            await campusAdminApi.blockIP({ ip, reason: confirmAction?.reason || reason.trim() || '后台手动封禁' });
             setMessage('IP 已封禁');
             setBlockIP('');
             setReason('');
+            setConfirmAction(null);
             window.setTimeout(() => setMessage(''), 2400);
             load();
         } catch (err) {
@@ -62,6 +74,7 @@ const AdminSecurity = () => {
         try {
             await campusAdminApi.unblockIP(ip);
             setMessage('IP 已解封');
+            setConfirmAction(null);
             window.setTimeout(() => setMessage(''), 2400);
             load();
         } catch (err) {
@@ -94,7 +107,7 @@ const AdminSecurity = () => {
                 <div className="admin-toolbar security">
                     <input className="admin-input" value={blockIP} onChange={(e) => setBlockIP(e.target.value)} placeholder="例如 127.0.0.1" />
                     <input className="admin-input" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="封禁原因，可选" />
-                    <button className="admin-button danger" onClick={submitBlock}>封禁</button>
+                    <button className="admin-button danger" onClick={openBlockConfirm}>封禁</button>
                 </div>
             </section>
 
@@ -153,7 +166,7 @@ const AdminSecurity = () => {
                                 <strong>{item.ip}</strong>
                                 <span>{item.reason || '未填写原因'} · {item.updated_at}</span>
                             </div>
-                            <button className="admin-button" onClick={() => unblock(item.ip)}>解封</button>
+                            <button className="admin-button" onClick={() => setConfirmAction({ type: 'unblock', ip: item.ip })}>解封</button>
                         </div>
                     ))}
                     {!(security?.blocked_ips || []).length && <div className="admin-empty compact">暂无封禁 IP</div>}
@@ -199,6 +212,27 @@ const AdminSecurity = () => {
                     {!(security?.recent_logs || []).length && <div className="admin-empty compact"><FiShield /> 暂无请求记录</div>}
                 </div>
             </section>
+
+            {confirmAction && (
+                <div className="admin-modal-backdrop" role="presentation">
+                    <div className="admin-confirm-modal">
+                        <div className="admin-modal-icon danger"><FiAlertTriangle /></div>
+                        <h3>{confirmAction.type === 'block' ? '确认封禁 IP？' : '确认解封 IP？'}</h3>
+                        <p>
+                            {confirmAction.type === 'block'
+                                ? `封禁后，来自 ${confirmAction.ip} 的请求会被拦截，可能影响同一出口网络下的正常用户。`
+                                : `解封后，${confirmAction.ip} 可以重新访问小程序和后台接口。`}
+                        </p>
+                        {confirmAction.type === 'block' && <p className="admin-confirm-warning">建议只在明显恶意请求、刷接口或攻击行为时封禁，并保留原因。</p>}
+                        <div className="admin-modal-actions">
+                            <button className="admin-button" onClick={() => setConfirmAction(null)}>取消</button>
+                            <button className={confirmAction.type === 'block' ? 'admin-button danger' : 'admin-button primary'} onClick={() => (confirmAction.type === 'block' ? submitBlock() : unblock(confirmAction.ip))}>
+                                {confirmAction.type === 'block' ? '确认封禁' : '确认解封'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
