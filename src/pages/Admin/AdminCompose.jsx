@@ -19,14 +19,6 @@ const initialForm = {
     sort_weight: 100,
 };
 
-const initialNotice = {
-    title: '',
-    content: '',
-    link_page: 'community',
-    link_params: '',
-    audience: 'all_users',
-};
-
 const contentTemplates = [
     {
         name: '报到总攻略',
@@ -264,12 +256,10 @@ const contentTemplates = [
 
 const AdminCompose = () => {
     const [form, setForm] = useState(initialForm);
-    const [notice, setNotice] = useState(initialNotice);
     const [categories, setCategories] = useState([]);
     const [message, setMessage] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
-    const [noticeLoading, setNoticeLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [showAdvanced, setShowAdvanced] = useState(false);
     const fileInputRef = useRef(null);
@@ -285,10 +275,6 @@ const AdminCompose = () => {
 
     const update = (key, value) => {
         setForm((prev) => ({ ...prev, [key]: value }));
-    };
-
-    const updateNotice = (key, value) => {
-        setNotice((prev) => ({ ...prev, [key]: value }));
     };
 
     const updateImages = (nextImages, nextCover = form.cover_url) => {
@@ -375,28 +361,6 @@ const AdminCompose = () => {
             setError(err.message || '发布失败');
         } finally {
             setLoading(false);
-        }
-    };
-
-    const submitNotice = async () => {
-        if (noticeLoading) return;
-        setNoticeLoading(true);
-        setError('');
-        setMessage('');
-        try {
-            await campusAdminApi.createNotification({
-                title: notice.title,
-                content: notice.content,
-                link_page: notice.link_page || 'community',
-                link_params: parseNoticeParams(notice),
-                audience: notice.audience || 'all_users',
-            });
-            setMessage('系统通知已发送');
-            setNotice(initialNotice);
-        } catch (err) {
-            setError(err.message || '系统通知发送失败');
-        } finally {
-            setNoticeLoading(false);
         }
     };
 
@@ -531,39 +495,6 @@ const AdminCompose = () => {
                         <p className="admin-muted">默认三项都开，适合开学前官方攻略。普通公告可以关掉置顶。</p>
                     </section>
 
-                    <section className="admin-panel admin-notice-panel">
-                        <h2>发系统通知</h2>
-                        <p>用于内测公告、维护提醒、活动提醒，会出现在小程序“我的 - 消息中心”。</p>
-                        <div className="admin-form notice-form">
-                            <div className="admin-field">
-                                <label>通知标题</label>
-                                <input className="admin-input" value={notice.title} onChange={(e) => updateNotice('title', e.target.value)} maxLength={60} placeholder="例如：今晚 10 点短暂维护" />
-                            </div>
-                            <div className="admin-field">
-                                <label>通知内容</label>
-                                <textarea className="admin-textarea" value={notice.content} onChange={(e) => updateNotice('content', e.target.value)} maxLength={500} placeholder="写清楚对用户有什么影响，尽量一句话能看懂。" />
-                            </div>
-                            <div className="admin-field">
-                                <label>点击后打开</label>
-                                <select className="admin-select" value={notice.link_page} onChange={(e) => updateNotice('link_page', e.target.value)}>
-                                    <option value="community">首页</option>
-                                    <option value="timetable">课表</option>
-                                    <option value="post-detail">指定帖子</option>
-                                </select>
-                            </div>
-                            {notice.link_page === 'post-detail' && (
-                                <div className="admin-field">
-                                    <label>帖子 ID</label>
-                                    <input className="admin-input" value={notice.link_params} onChange={(e) => updateNotice('link_params', e.target.value)} placeholder="填写帖子 ID" />
-                                </div>
-                            )}
-                            <button className="admin-button primary" type="button" disabled={noticeLoading} onClick={submitNotice}>
-                                <FiSend />
-                                {noticeLoading ? '发送中...' : '发送给全部用户'}
-                            </button>
-                        </div>
-                    </section>
-
                     <section className="admin-preview-panel">
                         <div className="admin-phone-preview">
                             <div className="admin-preview-cover">
@@ -594,11 +525,5 @@ const AdminCompose = () => {
         </div>
     );
 };
-
-function parseNoticeParams(notice) {
-    if (notice.link_page !== 'post-detail') return {};
-    const id = String(notice.link_params || '').trim();
-    return id ? { id } : {};
-}
 
 export default AdminCompose;

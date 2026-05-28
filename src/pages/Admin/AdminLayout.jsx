@@ -1,5 +1,5 @@
 import { NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { FiBarChart2, FiEdit3, FiFlag, FiFileText, FiKey, FiMessageSquare, FiSend, FiShield, FiUsers } from 'react-icons/fi';
+import { FiBarChart2, FiBell, FiEdit3, FiFlag, FiFileText, FiKey, FiMessageSquare, FiSend, FiShield, FiUsers } from 'react-icons/fi';
 import { clearUserData, getCurrentUser, isLoggedIn } from '../../api/user';
 import './Admin.css';
 
@@ -7,6 +7,7 @@ const navItems = [
     { to: '/admin', label: '数据总览', end: true, icon: <FiBarChart2 /> },
     { to: '/admin/posts', label: '内容工作台', icon: <FiFileText /> },
     { to: '/admin/compose', label: '运营发帖', icon: <FiEdit3 /> },
+    { to: '/admin/notifications', label: '通知中心', icon: <FiBell /> },
     { to: '/admin/comments', label: '评论管理', icon: <FiMessageSquare /> },
     { to: '/admin/reports', label: '举报处理', icon: <FiFlag /> },
     { to: '/admin/feedback', label: '用户反馈', icon: <FiSend /> },
@@ -16,15 +17,16 @@ const navItems = [
 ];
 
 const navGroups = [
-    { title: '运营增长', items: navItems.slice(0, 3) },
-    { title: '内容治理', items: navItems.slice(3, 6) },
-    { title: '用户与安全', items: navItems.slice(6) },
+    { title: '运营增长', items: navItems.slice(0, 4) },
+    { title: '内容治理', items: navItems.slice(4, 7) },
+    { title: '用户与安全', items: navItems.slice(7) },
 ];
 
 const titleMap = {
     '/admin': '数据总览',
     '/admin/posts': '内容工作台',
     '/admin/compose': '运营发帖',
+    '/admin/notifications': '通知中心',
     '/admin/comments': '评论管理',
     '/admin/reports': '举报处理',
     '/admin/feedback': '用户反馈',
@@ -36,7 +38,8 @@ const titleMap = {
 const subtitleMap = {
     '/admin': '先看待办、流量、互动和风险，再决定今天要发什么内容。',
     '/admin/posts': '管理首页内容流，处理置顶、精选、下架和内容状态。',
-    '/admin/compose': '用深汕e仔发布官方内容，也可以给内测用户发系统通知。',
+    '/admin/compose': '用深汕e仔发布官方攻略、问答和新生内容。',
+    '/admin/notifications': '给小程序消息中心发送内测公告、维护提醒和活动通知。',
     '/admin/comments': '处理评论可见性，查看评论来源和关联原帖。',
     '/admin/reports': '按举报对象处理内容风险，必要时下架帖子或评论。',
     '/admin/feedback': '收集用户建议和问题反馈，标记跟进状态。',
