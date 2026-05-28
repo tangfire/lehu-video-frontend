@@ -1327,6 +1327,14 @@
     margin: 12px 0;
 }
 
+.admin-notice-panel {
+    margin-top: 14px;
+}
+
+.notice-form {
+    margin-top: 14px;
+}
+
 .admin-pill {
     height: 38px;
     border: 1px solid var(--admin-line);

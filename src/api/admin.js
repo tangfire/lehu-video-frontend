@@ -25,5 +25,6 @@ export const campusAdminApi = {
     unblockIP: (ip) => request.delete(`/campus/admin/security/ip-blocks/${encodeURIComponent(ip)}`),
     listUsers: (params) => request.get('/campus/admin/users', { params }),
     updateUserRole: (id, role) => request.put(`/campus/admin/users/${id}/role`, { role }),
+    createNotification: (data) => request.post('/campus/admin/notifications', data),
     listCategories: () => request.get('/campus/forum/categories'),
 };
