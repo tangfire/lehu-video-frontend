@@ -19,21 +19,13 @@ const authOptions = [
     ['已认证', '1'],
 ];
 
-const roleActions = [
-    ['operator', '设为运营', '可登录后台处理内容、举报和反馈'],
-    ['admin', '设为管理员', '可调整其他用户后台权限'],
-    ['user', '移除权限', '恢复为普通用户，仅保留小程序使用权限'],
-];
-
 const AdminUsers = () => {
     const [users, setUsers] = useState([]);
     const [filters, setFilters] = useState({ keyword: '', role: '', authStatus: '-1' });
     const [page, setPage] = useState(1);
     const [total, setTotal] = useState(0);
     const [error, setError] = useState('');
-    const [message, setMessage] = useState('');
     const [loading, setLoading] = useState(false);
-    const [confirmAction, setConfirmAction] = useState(null);
 
     const load = async (nextPage = page, nextFilters = filters) => {
         setLoading(true);
@@ -87,26 +79,13 @@ const AdminUsers = () => {
         load(1, next);
     };
 
-    const setRole = async (item, role) => {
-        try {
-            await campusAdminApi.updateUserRole(item.user.id, role);
-            setMessage(`已更新为${roleText(role)}`);
-            window.setTimeout(() => setMessage(''), 2400);
-            setConfirmAction(null);
-            load(page);
-        } catch (err) {
-            setError(err.message || '更新角色失败');
-        }
-    };
-
     return (
         <>
-            {message && <div className="admin-toast success">{message}</div>}
             <section className="admin-users-head">
                 <div>
                     <span className="admin-kicker">USER OPS</span>
                     <h2>用户工作台</h2>
-                    <p>用来识别活跃同学、运营账号和需要跟进的反馈/举报用户，不做复杂 CRM。</p>
+                    <p>用来识别活跃同学、内容贡献和需要跟进的反馈/举报用户。角色调整请去权限管理。</p>
                 </div>
                 <button className="admin-button" onClick={() => load(page)} disabled={loading}>
                     <FiRefreshCw className={loading ? 'spin' : ''} /> 刷新
@@ -156,7 +135,7 @@ const AdminUsers = () => {
             {!loading && users.length > 0 && (
                 <div className="admin-user-list">
                     {users.map((item) => (
-                        <UserCard item={item} key={item.user.id} onRole={(role) => setConfirmAction({ item, role })} />
+                        <UserCard item={item} key={item.user.id} />
                     ))}
                 </div>
             )}
@@ -165,20 +144,11 @@ const AdminUsers = () => {
                 <button className="admin-button" disabled={page <= 1} onClick={() => load(page - 1)}>上一页</button>
                 <button className="admin-button" disabled={page * pageSize >= total} onClick={() => load(page + 1)}>下一页</button>
             </div>
-
-            {confirmAction && (
-                <RoleConfirmModal
-                    item={confirmAction.item}
-                    role={confirmAction.role}
-                    onCancel={() => setConfirmAction(null)}
-                    onConfirm={() => setRole(confirmAction.item, confirmAction.role)}
-                />
-            )}
         </>
     );
 };
 
-const UserCard = ({ item, onRole }) => {
+const UserCard = ({ item }) => {
     const user = item.user || {};
     const profile = item.profile || {};
     const name = user.nickname || user.name || profile.real_name || '深汕同学';
@@ -231,18 +201,9 @@ const UserCard = ({ item, onRole }) => {
                     <span><FiAlertCircle /> 举报 {compactNumber(item.report_count || 0)}</span>
                     {item.last_login_at && <span><FiAward /> 最近登录 {item.last_login_at}</span>}
                 </div>
-                <div className="admin-user-actions">
-                    {roleActions.map(([nextRole, label, title]) => (
-                        <button
-                            className={`admin-button ${nextRole === 'user' ? 'danger' : ''}`}
-                            disabled={nextRole === role}
-                            title={title}
-                            key={nextRole}
-                            onClick={() => onRole(nextRole)}
-                        >
-                            {label}
-                        </button>
-                    ))}
+                <div className="admin-user-note">
+                    <FiShield />
+                    <span>当前角色：{roleText(role)}。权限分配已移到独立模块，避免在用户查看时误操作。</span>
                 </div>
             </div>
         </article>
@@ -255,23 +216,5 @@ const Metric = ({ label, value }) => (
         <span>{label}</span>
     </div>
 );
-
-const RoleConfirmModal = ({ item, role, onCancel, onConfirm }) => {
-    const name = item.user?.nickname || item.user?.name || item.profile?.real_name || '该用户';
-    const action = roleActions.find(([value]) => value === role);
-    return (
-        <div className="admin-modal-backdrop" role="presentation">
-            <div className="admin-confirm-modal">
-                <div className="admin-modal-icon"><FiShield /></div>
-                <h3>确认调整权限？</h3>
-                <p>将「{name}」更新为「{roleText(role)}」。{action ? action[2] : ''}</p>
-                <div className="admin-modal-actions">
-                    <button className="admin-button" onClick={onCancel}>取消</button>
-                    <button className={`admin-button ${role === 'user' ? 'danger' : 'primary'}`} onClick={onConfirm}>确认</button>
-                </div>
-            </div>
-        </div>
-    );
-};
 
 export default AdminUsers;

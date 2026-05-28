@@ -1,5 +1,5 @@
 import { NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { FiBarChart2, FiEdit3, FiFlag, FiFileText, FiMessageSquare, FiSend, FiShield, FiUsers } from 'react-icons/fi';
+import { FiBarChart2, FiEdit3, FiFlag, FiFileText, FiKey, FiMessageSquare, FiSend, FiShield, FiUsers } from 'react-icons/fi';
 import { clearUserData, getCurrentUser, isLoggedIn } from '../../api/user';
 import './Admin.css';
 
@@ -12,6 +12,7 @@ const navItems = [
     { to: '/admin/feedback', label: '用户反馈', icon: <FiSend /> },
     { to: '/admin/security', label: '安全中心', icon: <FiShield /> },
     { to: '/admin/users', label: '用户管理', icon: <FiUsers /> },
+    { to: '/admin/permissions', label: '权限管理', icon: <FiKey /> },
 ];
 
 const titleMap = {
@@ -23,6 +24,7 @@ const titleMap = {
     '/admin/feedback': '用户反馈',
     '/admin/security': '安全中心',
     '/admin/users': '用户管理',
+    '/admin/permissions': '权限管理',
 };
 
 const AdminLayout = () => {

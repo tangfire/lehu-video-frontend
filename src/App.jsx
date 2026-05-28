@@ -31,6 +31,7 @@ import AdminReports from './pages/Admin/AdminReports.jsx';
 import AdminUsers from './pages/Admin/AdminUsers.jsx';
 import AdminFeedback from './pages/Admin/AdminFeedback.jsx';
 import AdminSecurity from './pages/Admin/AdminSecurity.jsx';
+import AdminPermissions from './pages/Admin/AdminPermissions.jsx';
 
 function App() {
     return (
@@ -114,6 +115,7 @@ function App() {
                             <Route path="feedback" element={<AdminFeedback />} />
                             <Route path="security" element={<AdminSecurity />} />
                             <Route path="users" element={<AdminUsers />} />
+                            <Route path="permissions" element={<AdminPermissions />} />
                         </Route>
                         <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>
