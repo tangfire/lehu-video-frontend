@@ -73,14 +73,15 @@ const AdminNotifications = () => {
         setMessage('');
         setError('');
         try {
-            await campusAdminApi.createNotification({
+            const res = await campusAdminApi.createNotification({
                 title: notice.title.trim(),
                 content: notice.content.trim(),
                 link_page: notice.link_page || 'community',
                 link_params: parseNoticeParams(notice),
                 audience: notice.audience || 'all_users',
             });
-            setMessage('系统通知已加入发送队列，稍后会出现在小程序消息中心');
+            const taskId = res?.task_id ? `，任务ID：${res.task_id}` : '';
+            setMessage(`系统通知已加入可靠发送任务${taskId}`);
             setNotice(initialNotice);
         } catch (err) {
             setError(err.message || '系统通知发送失败');
