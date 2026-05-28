@@ -50,6 +50,7 @@ const AdminKnowledge = () => {
     const [uploadMeta, setUploadMeta] = useState({ title: '', source: '学校官方资料', category: 'general' });
     const [testQuery, setTestQuery] = useState('');
     const [testResult, setTestResult] = useState(null);
+    const [ragHealth, setRagHealth] = useState(null);
     const [loading, setLoading] = useState(false);
     const [working, setWorking] = useState('');
     const [error, setError] = useState('');
@@ -85,9 +86,19 @@ const AdminKnowledge = () => {
         }
     }, []);
 
+    const loadRagHealth = useCallback(async () => {
+        try {
+            const data = await campusAdminApi.aiReplySummary();
+            setRagHealth(data.rag_health || null);
+        } catch {
+            setRagHealth({ status: 'unavailable', qdrant: 'unknown', last_error: '无法获取 RAG 状态' });
+        }
+    }, []);
+
     useEffect(() => {
         loadDocuments(1);
         loadLogs();
+        loadRagHealth();
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     const activeCount = useMemo(() => documents.filter((item) => item.status === 'active').length, [documents]);
@@ -224,13 +235,23 @@ const AdminKnowledge = () => {
                     <h2>让 e仔有资料可查</h2>
                     <p>上传学校官方资料或录入已确认信息，e仔被 @ 时会先判断是否需要查库，再基于命中的资料自然回复。</p>
                 </div>
-                <button className="admin-button" type="button" onClick={() => { loadDocuments(page); loadLogs(); }} disabled={loading}>
+                <button className="admin-button" type="button" onClick={() => { loadDocuments(page); loadLogs(); loadRagHealth(); }} disabled={loading}>
                     <FiRefreshCw className={loading ? 'spin' : ''} />
                     刷新
                 </button>
             </section>
 
             <section className="admin-key-grid ai">
+                <div className={`admin-key-stat knowledge-health ${ragHealth?.status === 'ok' ? 'ok' : 'warn'}`}>
+                    <span>RAG 服务</span>
+                    <strong>{ragHealth?.status || '未知'}</strong>
+                    <em>Qdrant {ragHealth?.qdrant || '-'}</em>
+                </div>
+                <div className="admin-key-stat knowledge-health">
+                    <span>活跃片段</span>
+                    <strong>{compactNumber(ragHealth?.chunk_count || 0)}</strong>
+                    <em>真实参与 e仔检索</em>
+                </div>
                 <div className="admin-key-stat">
                     <span>当前文档</span>
                     <strong>{compactNumber(total)}</strong>
@@ -252,6 +273,7 @@ const AdminKnowledge = () => {
                     <em>用于追溯 e仔回答依据</em>
                 </div>
             </section>
+            {ragHealth?.last_error && <div className="admin-rag-health-error">RAG 最近错误：{ragHealth.last_error}</div>}
 
             <div className="admin-knowledge-grid">
                 <section className="admin-panel">
