@@ -113,7 +113,17 @@ const AdminAIReplies = () => {
                 </div>
                 <div className="admin-ai-note">
                     <FiCpu />
-                    <span>用户评论里 @深汕e仔 后，后端会落任务表，由后台任务异步生成一条官方账号回复。</span>
+                    <span>用户评论里 @深汕e仔 后，后端会落任务表；需要校园事实时会先查 e仔知识库，再生成官方账号回复。</span>
+                </div>
+                <div className={`admin-ai-status ${summary?.rag_health?.status === 'ok' ? 'ok' : 'off'}`}>
+                    {summary?.rag_health?.status === 'ok' ? <FiCheckCircle /> : <FiAlertCircle />}
+                    <div>
+                        <strong>RAG：{summary?.rag_health?.status || '未知'}</strong>
+                        <span>
+                            Qdrant {summary?.rag_health?.qdrant || '-'} · 知识片段 {compactNumber(summary?.rag_health?.chunk_count || 0)}
+                            {summary?.rag_health?.last_error ? ` · ${summary.rag_health.last_error}` : ''}
+                        </span>
+                    </div>
                 </div>
             </section>
 

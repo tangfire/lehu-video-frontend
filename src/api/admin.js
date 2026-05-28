@@ -19,6 +19,18 @@ export const campusAdminApi = {
     aiReplySummary: () => request.get('/campus/admin/ai-replies/summary'),
     listAiReplyTasks: (params) => request.get('/campus/admin/ai-replies/tasks', { params }),
     retryAiReplyTask: (id) => request.post(`/campus/admin/ai-replies/tasks/${id}/retry`),
+    listKnowledgeDocuments: (params) => request.get('/campus/admin/knowledge/documents', { params }),
+    createKnowledgeDocument: (data) => request.post('/campus/admin/knowledge/documents', data),
+    updateKnowledgeDocument: (id, data) => request.put(`/campus/admin/knowledge/documents/${id}`, data),
+    reindexKnowledgeDocument: (id) => request.post(`/campus/admin/knowledge/documents/${id}/reindex`),
+    listKnowledgeChunks: (id, params) => request.get(`/campus/admin/knowledge/documents/${id}/chunks`, { params }),
+    testKnowledgeQuery: (data) => request.post('/campus/admin/knowledge/test-query', data),
+    listKnowledgeQueryLogs: (params) => request.get('/campus/admin/knowledge/query-logs', { params }),
+    uploadKnowledgeFile: (file) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        return request.post('/campus/admin/knowledge/upload', formData);
+    },
     listReports: (params) => request.get('/campus/admin/reports', { params }),
     reviewReport: (id, data) => request.post(`/campus/admin/reports/${id}/review`, data),
     listFeedback: (params) => request.get('/campus/admin/feedback', { params }),

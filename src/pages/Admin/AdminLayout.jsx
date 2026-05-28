@@ -1,5 +1,5 @@
 import { NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { FiBarChart2, FiBell, FiCpu, FiEdit3, FiFlag, FiFileText, FiKey, FiMessageSquare, FiSend, FiShield, FiUsers } from 'react-icons/fi';
+import { FiBarChart2, FiBell, FiBookOpen, FiCpu, FiEdit3, FiFlag, FiFileText, FiKey, FiMessageSquare, FiSend, FiShield, FiUsers } from 'react-icons/fi';
 import { clearUserData, getCurrentUser, isLoggedIn } from '../../api/user';
 import './Admin.css';
 
@@ -9,6 +9,7 @@ const navItems = [
     { to: '/admin/compose', label: '运营发帖', icon: <FiEdit3 /> },
     { to: '/admin/notifications', label: '通知中心', icon: <FiBell /> },
     { to: '/admin/ai-replies', label: 'e仔回复', icon: <FiCpu /> },
+    { to: '/admin/knowledge', label: 'e仔知识库', icon: <FiBookOpen /> },
     { to: '/admin/comments', label: '评论管理', icon: <FiMessageSquare /> },
     { to: '/admin/reports', label: '举报处理', icon: <FiFlag /> },
     { to: '/admin/feedback', label: '用户反馈', icon: <FiSend /> },
@@ -18,9 +19,9 @@ const navItems = [
 ];
 
 const navGroups = [
-    { title: '运营增长', items: navItems.slice(0, 5) },
-    { title: '内容治理', items: navItems.slice(5, 8) },
-    { title: '用户与安全', items: navItems.slice(8) },
+    { title: '运营增长', items: navItems.slice(0, 6) },
+    { title: '内容治理', items: navItems.slice(6, 9) },
+    { title: '用户与安全', items: navItems.slice(9) },
 ];
 
 const titleMap = {
@@ -29,6 +30,7 @@ const titleMap = {
     '/admin/compose': '运营发帖',
     '/admin/notifications': '通知中心',
     '/admin/ai-replies': 'e仔回复',
+    '/admin/knowledge': 'e仔知识库',
     '/admin/comments': '评论管理',
     '/admin/reports': '举报处理',
     '/admin/feedback': '用户反馈',
@@ -43,6 +45,7 @@ const subtitleMap = {
     '/admin/compose': '用深汕e仔发布官方攻略、问答和新生内容。',
     '/admin/notifications': '给小程序消息中心发送内测公告、维护提醒和活动通知。',
     '/admin/ai-replies': '查看 @深汕e仔 自动回复链路是否启用、是否失败，并手动重试。',
+    '/admin/knowledge': '维护 e仔回答校园问题时可引用的资料，上传文档、录入信息并测试命中效果。',
     '/admin/comments': '处理评论可见性，查看评论来源和关联原帖。',
     '/admin/reports': '按举报对象处理内容风险，必要时下架帖子或评论。',
     '/admin/feedback': '收集用户建议和问题反馈，标记跟进状态。',

@@ -1540,7 +1540,7 @@
 
 .admin-ai-health {
     display: grid;
-    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr);
     gap: 12px;
 }
 
@@ -1692,6 +1692,170 @@
 .admin-status.ai-status-failed {
     background: #fef2f2;
     color: #b91c1c;
+}
+
+.admin-knowledge-page {
+    display: grid;
+    gap: 16px;
+}
+
+.admin-simple-head.knowledge {
+    background: linear-gradient(135deg, #fff8f7, #fff);
+}
+
+.admin-knowledge-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 360px;
+    gap: 16px;
+    align-items: start;
+}
+
+.admin-knowledge-grid.bottom {
+    grid-template-columns: minmax(0, 1fr) minmax(360px, 0.72fr);
+}
+
+.admin-toolbar.knowledge {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 140px 130px auto;
+    gap: 10px;
+    margin-bottom: 14px;
+}
+
+.admin-knowledge-list,
+.admin-knowledge-side,
+.admin-knowledge-chunks {
+    display: grid;
+    gap: 10px;
+}
+
+.admin-knowledge-doc {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+    padding: 14px;
+    border: 1px solid var(--admin-line);
+    border-radius: 8px;
+    background: #fff;
+    cursor: pointer;
+}
+
+.admin-knowledge-doc.active {
+    border-color: var(--admin-primary);
+    background: #fffafb;
+}
+
+.admin-knowledge-doc-main strong {
+    display: block;
+    margin-top: 8px;
+    font-size: 15px;
+}
+
+.admin-knowledge-doc-main p {
+    margin: 6px 0 0;
+    color: var(--admin-muted);
+    font-size: 12px;
+}
+
+.admin-knowledge-doc-actions {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.admin-upload-button {
+    min-height: 72px;
+    display: grid;
+    place-items: center;
+    gap: 6px;
+    border: 1px dashed #f4a1aa;
+    border-radius: 8px;
+    background: #fff8f9;
+    color: var(--admin-primary);
+    font-weight: 950;
+    cursor: pointer;
+}
+
+.admin-upload-button input {
+    display: none;
+}
+
+.admin-upload-button.disabled {
+    opacity: 0.62;
+    cursor: not-allowed;
+}
+
+.admin-knowledge-chunk {
+    padding: 13px;
+    border: 1px solid var(--admin-line);
+    border-radius: 8px;
+    background: #fff;
+}
+
+.admin-knowledge-chunk span {
+    color: var(--admin-primary);
+    font-size: 12px;
+    font-weight: 900;
+}
+
+.admin-knowledge-chunk p {
+    margin: 8px 0 0;
+    color: var(--admin-text);
+    line-height: 1.75;
+    white-space: pre-wrap;
+}
+
+.admin-test-query-row {
+    margin-bottom: 12px;
+}
+
+.admin-rag-result {
+    display: grid;
+    gap: 10px;
+}
+
+.admin-rag-result article {
+    padding: 12px;
+    border: 1px solid var(--admin-line);
+    border-radius: 8px;
+    background: #fbfaf9;
+}
+
+.admin-rag-result article strong,
+.admin-rag-result article span {
+    display: block;
+}
+
+.admin-rag-result article span {
+    margin-top: 4px;
+    color: var(--admin-muted);
+    font-size: 12px;
+}
+
+.admin-rag-result article p {
+    margin-top: 8px;
+    color: var(--admin-text);
+    line-height: 1.6;
+}
+
+.admin-status.knowledge-status-active {
+    background: #ecfdf5;
+    color: #047857;
+}
+
+.admin-status.knowledge-status-indexing {
+    background: #eff6ff;
+    color: #2563eb;
+}
+
+.admin-status.knowledge-status-failed {
+    background: #fef2f2;
+    color: #b91c1c;
+}
+
+.admin-status.knowledge-status-disabled,
+.admin-status.knowledge-status-draft {
+    background: #f1f5f9;
+    color: #64748b;
 }
 
 .admin-composer-grid {
@@ -2140,7 +2304,9 @@
 
     .admin-two-column,
     .admin-composer-grid,
-    .admin-ai-health {
+    .admin-ai-health,
+    .admin-knowledge-grid,
+    .admin-knowledge-grid.bottom {
         grid-template-columns: 1fr;
     }
 
@@ -2165,6 +2331,10 @@
     }
 
     .admin-user-filter.permission {
+        grid-template-columns: 1fr 140px;
+    }
+
+    .admin-toolbar.knowledge {
         grid-template-columns: 1fr 140px;
     }
 
@@ -2242,6 +2412,15 @@
     }
 
     .admin-ai-task-actions {
+        justify-content: flex-start;
+    }
+
+    .admin-toolbar.knowledge,
+    .admin-knowledge-doc {
+        grid-template-columns: 1fr;
+    }
+
+    .admin-knowledge-doc-actions {
         justify-content: flex-start;
     }
 }
