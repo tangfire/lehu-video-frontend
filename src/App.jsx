@@ -33,6 +33,7 @@ import AdminFeedback from './pages/Admin/AdminFeedback.jsx';
 import AdminSecurity from './pages/Admin/AdminSecurity.jsx';
 import AdminPermissions from './pages/Admin/AdminPermissions.jsx';
 import AdminNotifications from './pages/Admin/AdminNotifications.jsx';
+import AdminAIReplies from './pages/Admin/AdminAIReplies.jsx';
 
 function App() {
     return (
@@ -112,6 +113,7 @@ function App() {
                             <Route path="posts" element={<AdminPosts />} />
                             <Route path="compose" element={<AdminCompose />} />
                             <Route path="notifications" element={<AdminNotifications />} />
+                            <Route path="ai-replies" element={<AdminAIReplies />} />
                             <Route path="comments" element={<AdminComments />} />
                             <Route path="reports" element={<AdminReports />} />
                             <Route path="feedback" element={<AdminFeedback />} />

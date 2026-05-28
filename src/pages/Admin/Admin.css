@@ -453,6 +453,11 @@
     font-style: normal;
 }
 
+.admin-ops-note.ai {
+    border-color: #dbeafe;
+    background: #f8fbff;
+}
+
 .admin-panel {
     padding: 18px;
     border: 1px solid var(--admin-line);
@@ -1524,6 +1529,171 @@
     font-size: 18px;
 }
 
+.admin-ai-page {
+    display: grid;
+    gap: 16px;
+}
+
+.admin-simple-head.ai {
+    background: linear-gradient(135deg, #fff8f9, #fff);
+}
+
+.admin-ai-health {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    gap: 12px;
+}
+
+.admin-ai-status,
+.admin-ai-note {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    border: 1px solid var(--admin-line);
+    border-radius: 8px;
+    background: #fff;
+}
+
+.admin-ai-status svg,
+.admin-ai-note svg {
+    flex: 0 0 22px;
+    width: 22px;
+    height: 22px;
+}
+
+.admin-ai-status.ok svg {
+    color: var(--admin-success);
+}
+
+.admin-ai-status.off svg {
+    color: var(--admin-warn);
+}
+
+.admin-ai-status strong {
+    display: block;
+    font-size: 16px;
+}
+
+.admin-ai-status span,
+.admin-ai-note span {
+    display: block;
+    margin-top: 4px;
+    color: var(--admin-muted);
+    font-size: 13px;
+}
+
+.admin-key-grid.ai {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.admin-segment {
+    display: inline-flex;
+    gap: 4px;
+    padding: 4px;
+    border-radius: 8px;
+    background: #f8fafc;
+}
+
+.admin-segment button {
+    min-height: 32px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: #64748b;
+    font-weight: 850;
+    cursor: pointer;
+}
+
+.admin-segment button.active {
+    background: #fff;
+    color: var(--admin-primary);
+    box-shadow: 0 2px 8px rgba(17, 24, 39, 0.08);
+}
+
+.admin-ai-task-list {
+    display: grid;
+    gap: 10px;
+}
+
+.admin-ai-task {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 14px;
+    padding: 14px;
+    border: 1px solid var(--admin-line);
+    border-radius: 8px;
+    background: #fff;
+}
+
+.admin-ai-task-head,
+.admin-ai-task-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.admin-ai-task-head span:not(.admin-status),
+.admin-ai-task-meta span,
+.admin-ai-task-meta a {
+    color: var(--admin-muted);
+    font-size: 12px;
+}
+
+.admin-ai-task p {
+    margin: 10px 0;
+    color: var(--admin-text);
+    font-size: 14px;
+    line-height: 1.7;
+}
+
+.admin-ai-error {
+    margin-bottom: 10px;
+    padding: 9px 10px;
+    border-radius: 6px;
+    background: #fef2f2;
+    color: #b91c1c;
+    font-size: 12px;
+    line-height: 1.5;
+    word-break: break-word;
+}
+
+.admin-ai-task-meta a {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--admin-primary);
+    text-decoration: none;
+    font-weight: 850;
+}
+
+.admin-ai-task-actions {
+    display: flex;
+    align-items: flex-start;
+}
+
+.admin-status.ai-status-pending {
+    background: #fffbeb;
+    color: #b45309;
+}
+
+.admin-status.ai-status-processing {
+    background: #eff6ff;
+    color: #2563eb;
+}
+
+.admin-status.ai-status-done {
+    background: #ecfdf5;
+    color: #047857;
+}
+
+.admin-status.ai-status-failed {
+    background: #fef2f2;
+    color: #b91c1c;
+}
+
 .admin-composer-grid {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 360px;
@@ -1969,7 +2139,8 @@
     }
 
     .admin-two-column,
-    .admin-composer-grid {
+    .admin-composer-grid,
+    .admin-ai-health {
         grid-template-columns: 1fr;
     }
 
@@ -2036,7 +2207,8 @@
     .admin-simple-filter-row,
     .admin-template-grid,
     .admin-mini-stat-grid,
-    .admin-key-grid {
+    .admin-key-grid,
+    .admin-key-grid.ai {
         grid-template-columns: 1fr;
     }
 
@@ -2062,6 +2234,14 @@
     }
 
     .admin-weight-editor {
+        justify-content: flex-start;
+    }
+
+    .admin-ai-task {
+        grid-template-columns: 1fr;
+    }
+
+    .admin-ai-task-actions {
         justify-content: flex-start;
     }
 }

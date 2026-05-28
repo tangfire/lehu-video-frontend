@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { FiArrowRight, FiEdit3, FiFileText, FiFlag, FiMessageCircle, FiRefreshCw, FiSend, FiStar } from 'react-icons/fi';
+import { FiArrowRight, FiCpu, FiEdit3, FiFileText, FiFlag, FiMessageCircle, FiRefreshCw, FiSend, FiStar } from 'react-icons/fi';
 import { campusAdminApi } from '../../api/admin';
 import { compactNumber, excerpt, postCover, postTypeText, ratioText } from './adminUtils';
 import './Admin.css';
@@ -8,6 +8,7 @@ import './Admin.css';
 const AdminDashboard = () => {
     const [summary, setSummary] = useState(null);
     const [hotPosts, setHotPosts] = useState([]);
+    const [aiSummary, setAiSummary] = useState(null);
     const [error, setError] = useState('');
     const [reconcileLoading, setReconcileLoading] = useState(false);
     const [reconcileResult, setReconcileResult] = useState(null);
@@ -17,11 +18,13 @@ const AdminDashboard = () => {
         Promise.all([
             campusAdminApi.summary(),
             campusAdminApi.listPosts({ sort: 'hot', status: 1, size: 5 }),
+            campusAdminApi.aiReplySummary(),
         ])
-            .then(([summaryData, postsData]) => {
+            .then(([summaryData, postsData, aiData]) => {
                 if (!mounted) return;
                 setSummary(summaryData.summary || {});
                 setHotPosts(postsData.posts || []);
+                setAiSummary(aiData.summary || {});
             })
             .catch((err) => {
                 if (mounted) setError(err.message || '获取数据失败');
@@ -63,8 +66,11 @@ const AdminDashboard = () => {
         if (Number(summary.today_posts || 0) < 3) {
             items.push({ icon: <FiEdit3 />, title: '补 3 条官方内容', detail: '报到攻略、宿舍 FAQ、问答引导最适合今天发', to: '/admin/compose' });
         }
+        if (Number(aiSummary?.failed || 0) > 0) {
+            items.push({ icon: <FiCpu />, title: '处理 e仔回复失败', detail: `${aiSummary.failed} 条自动回复任务失败`, to: '/admin/ai-replies' });
+        }
         return items.length > 0 ? items : [{ icon: <FiStar />, title: '今天状态不错', detail: '没有紧急待办，可以继续准备种子内容', to: '/admin/compose' }];
-    }, [summary]);
+    }, [summary, aiSummary]);
 
     const handleReconcileStats = async () => {
         if (reconcileLoading) return;
@@ -151,6 +157,22 @@ const AdminDashboard = () => {
                     <em>建议发布高峰后手动跑一次。</em>
                 )}
             </section>
+
+            {aiSummary && (
+                <section className="admin-ops-note ai">
+                    <div>
+                        <strong>e仔自动回复</strong>
+                        <span>
+                            {aiSummary.enabled
+                                ? `${aiSummary.bot_ready ? 'Bot 已确认' : 'Bot 账号待确认'}，今日 ${compactNumber(aiSummary.today_used)} / ${compactNumber(aiSummary.daily_limit)}，待处理 ${compactNumber(aiSummary.pending)}，失败 ${compactNumber(aiSummary.failed)}`
+                                : '未启用，需要配置大模型 Key 和 e仔官方用户 ID。'}
+                        </span>
+                    </div>
+                    <Link className="admin-button" to="/admin/ai-replies">
+                        查看链路
+                    </Link>
+                </section>
+            )}
 
             <section className="admin-two-column simple">
                 <div className="admin-panel">
