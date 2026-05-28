@@ -26,15 +26,12 @@ import AdminLayout from './pages/Admin/AdminLayout.jsx';
 import AdminDashboard from './pages/Admin/AdminDashboard.jsx';
 import AdminPosts from './pages/Admin/AdminPosts.jsx';
 import AdminCompose from './pages/Admin/AdminCompose.jsx';
-import AdminComments from './pages/Admin/AdminComments.jsx';
-import AdminReports from './pages/Admin/AdminReports.jsx';
 import AdminUsers from './pages/Admin/AdminUsers.jsx';
-import AdminFeedback from './pages/Admin/AdminFeedback.jsx';
 import AdminSecurity from './pages/Admin/AdminSecurity.jsx';
 import AdminPermissions from './pages/Admin/AdminPermissions.jsx';
 import AdminNotifications from './pages/Admin/AdminNotifications.jsx';
-import AdminAIReplies from './pages/Admin/AdminAIReplies.jsx';
-import AdminKnowledge from './pages/Admin/AdminKnowledge.jsx';
+import AdminModeration from './pages/Admin/AdminModeration.jsx';
+import AdminAssistant from './pages/Admin/AdminAssistant.jsx';
 
 function AppProviders({ children }) {
     const location = useLocation();
@@ -49,6 +46,13 @@ function AppProviders({ children }) {
             <WebSocketProvider>{children}</WebSocketProvider>
         </ChatProvider>
     );
+}
+
+function AdminLegacyRedirect({ to, tab }) {
+    const location = useLocation();
+    const params = new URLSearchParams(location.search);
+    params.set('tab', tab);
+    return <Navigate to={`${to}?${params.toString()}`} replace />;
 }
 
 function App() {
@@ -127,12 +131,14 @@ function App() {
                             <Route index element={<AdminDashboard />} />
                             <Route path="posts" element={<AdminPosts />} />
                             <Route path="compose" element={<AdminCompose />} />
+                            <Route path="moderation" element={<AdminModeration />} />
+                            <Route path="assistant" element={<AdminAssistant />} />
                             <Route path="notifications" element={<AdminNotifications />} />
-                            <Route path="ai-replies" element={<AdminAIReplies />} />
-                            <Route path="knowledge" element={<AdminKnowledge />} />
-                            <Route path="comments" element={<AdminComments />} />
-                            <Route path="reports" element={<AdminReports />} />
-                            <Route path="feedback" element={<AdminFeedback />} />
+                            <Route path="ai-replies" element={<AdminLegacyRedirect to="/admin/assistant" tab="status" />} />
+                            <Route path="knowledge" element={<AdminLegacyRedirect to="/admin/assistant" tab="knowledge" />} />
+                            <Route path="comments" element={<AdminLegacyRedirect to="/admin/moderation" tab="comments" />} />
+                            <Route path="reports" element={<AdminLegacyRedirect to="/admin/moderation" tab="reports" />} />
+                            <Route path="feedback" element={<AdminLegacyRedirect to="/admin/moderation" tab="feedback" />} />
                             <Route path="security" element={<AdminSecurity />} />
                             <Route path="users" element={<AdminUsers />} />
                             <Route path="permissions" element={<AdminPermissions />} />

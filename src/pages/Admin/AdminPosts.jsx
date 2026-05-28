@@ -34,7 +34,7 @@ const opsOptions = [
 
 const statusOptions = [
     ['全部状态', '-1'],
-    ['可见', '1'],
+    ['正常展示', '1'],
     ['待审核', '0'],
     ['已拒绝', '2'],
     ['已下架', '3'],
@@ -321,7 +321,7 @@ const AdminPosts = () => {
                                 {Number(post.status) === 1 ? (
                                     <button className="admin-button quiet" type="button" disabled>
                                         <FiCheckCircle />
-                                        已可见
+                                        正常展示
                                     </button>
                                 ) : (
                                     <button className="admin-button" disabled={actionLoading} onClick={() => updatePost(post, { status: 1, audit_reason: '' }, '内容已恢复可见')}>

@@ -71,7 +71,7 @@ const AdminReports = () => {
             return;
         }
         if (report.target_type === 'comment') {
-            window.open(`/admin/comments?post_id=${encodeURIComponent(String(postID))}`, '_blank', 'noopener,noreferrer');
+            window.open(`/admin/moderation?tab=comments&post_id=${encodeURIComponent(String(postID))}`, '_blank', 'noopener,noreferrer');
             return;
         }
         window.open(`/admin/posts?keyword=${encodeURIComponent(String(postID))}`, '_blank', 'noopener,noreferrer');

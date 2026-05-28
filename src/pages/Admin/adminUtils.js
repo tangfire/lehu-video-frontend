@@ -1,7 +1,7 @@
 export const statusText = (status) => {
     const map = {
         0: '待审核',
-        1: '可见',
+        1: '正常展示',
         2: '已拒绝',
         3: '已下架',
     };
@@ -44,6 +44,7 @@ export const toArrayFromLines = (value) => value
 
 export const compactNumber = (value) => {
     const number = Number(value || 0);
+    if (Number.isNaN(number)) return String(value || 0);
     if (number >= 10000) return `${(number / 10000).toFixed(1)}w`;
     if (number >= 1000) return `${(number / 1000).toFixed(1)}k`;
     return String(number);

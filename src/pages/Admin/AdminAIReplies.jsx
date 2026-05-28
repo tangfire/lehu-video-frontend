@@ -17,10 +17,10 @@ const statusText = (status) => {
     return map[status] || '全部';
 };
 
-const AdminAIReplies = () => {
+const AdminAIReplies = ({ mode = 'full', initialStatus = 'failed' }) => {
     const [summary, setSummary] = useState(null);
     const [tasks, setTasks] = useState([]);
-    const [status, setStatus] = useState('failed');
+    const [status, setStatus] = useState(initialStatus);
     const [page, setPage] = useState(1);
     const [total, setTotal] = useState(0);
     const [loading, setLoading] = useState(false);
@@ -87,17 +87,19 @@ const AdminAIReplies = () => {
             {error && <div className="admin-error">{error}</div>}
             {toast && <div className="admin-toast success">{toast}</div>}
 
-            <section className="admin-simple-head ai">
-                <div>
-                    <span className="admin-kicker">评论区小彩蛋</span>
-                    <h2>@深汕e仔 自动回复</h2>
-                    <p>这里不配置模型密钥，只看链路状态、失败原因，并把失败任务重新加入队列。</p>
-                </div>
-                <button className="admin-button" type="button" onClick={() => load(page, status)} disabled={loading}>
-                    <FiRefreshCw className={loading ? 'spin' : ''} />
-                    刷新
-                </button>
-            </section>
+            {mode === 'full' && (
+                <section className="admin-simple-head ai">
+                    <div>
+                        <span className="admin-kicker">评论区小彩蛋</span>
+                        <h2>@深汕e仔 自动回复</h2>
+                        <p>这里不配置模型密钥，只看链路状态、失败原因，并把失败任务重新加入队列。</p>
+                    </div>
+                    <button className="admin-button" type="button" onClick={() => load(page, status)} disabled={loading}>
+                        <FiRefreshCw className={loading ? 'spin' : ''} />
+                        刷新
+                    </button>
+                </section>
+            )}
 
             <section className="admin-ai-health">
                 <div className={`admin-ai-status ${summary?.enabled && summary?.bot_ready ? 'ok' : 'off'}`}>
@@ -137,7 +139,7 @@ const AdminAIReplies = () => {
                 ))}
             </section>
 
-            <section className="admin-panel">
+            {mode !== 'summary' && <section className="admin-panel">
                 <div className="admin-panel-head">
                     <div>
                         <h2>回复任务</h2>
@@ -198,7 +200,7 @@ const AdminAIReplies = () => {
                     <button className="admin-button" disabled={loading || page <= 1} onClick={() => load(page - 1, status)}>上一页</button>
                     <button className="admin-button" disabled={loading || page * pageSize >= total} onClick={() => load(page + 1, status)}>下一页</button>
                 </div>
-            </section>
+            </section>}
         </div>
     );
 };

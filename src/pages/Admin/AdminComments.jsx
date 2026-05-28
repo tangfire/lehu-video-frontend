@@ -86,7 +86,7 @@ const AdminComments = () => {
             <div className="admin-toolbar">
                 <select className="admin-select" value={status} onChange={(e) => setStatus(e.target.value)}>
                     <option value="-1">全部状态</option>
-                    <option value="1">可见</option>
+                    <option value="1">正常展示</option>
                     <option value="0">待审核</option>
                     <option value="2">已拒绝</option>
                     <option value="3">已下架</option>

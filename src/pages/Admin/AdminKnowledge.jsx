@@ -36,7 +36,7 @@ const initialManual = {
     status: 'active',
 };
 
-const AdminKnowledge = () => {
+const AdminKnowledge = ({ mode = 'full' }) => {
     const [documents, setDocuments] = useState([]);
     const [chunks, setChunks] = useState([]);
     const [logs, setLogs] = useState([]);
@@ -229,19 +229,21 @@ const AdminKnowledge = () => {
             {toast && <div className="admin-toast success">{toast}</div>}
             {error && <div className="admin-error">{error}</div>}
 
-            <section className="admin-simple-head knowledge">
-                <div>
-                    <span className="admin-kicker">RAG Knowledge Base</span>
-                    <h2>让 e仔有资料可查</h2>
-                    <p>上传学校官方资料或录入已确认信息，e仔被 @ 时会先判断是否需要查库，再基于命中的资料自然回复。</p>
-                </div>
-                <button className="admin-button" type="button" onClick={() => { loadDocuments(page); loadLogs(); loadRagHealth(); }} disabled={loading}>
-                    <FiRefreshCw className={loading ? 'spin' : ''} />
-                    刷新
-                </button>
-            </section>
+            {mode === 'full' && (
+                <section className="admin-simple-head knowledge">
+                    <div>
+                        <span className="admin-kicker">RAG Knowledge Base</span>
+                        <h2>让 e仔有资料可查</h2>
+                        <p>上传学校官方资料或录入已确认信息，e仔被 @ 时会先判断是否需要查库，再基于命中的资料自然回复。</p>
+                    </div>
+                    <button className="admin-button" type="button" onClick={() => { loadDocuments(page); loadLogs(); loadRagHealth(); }} disabled={loading}>
+                        <FiRefreshCw className={loading ? 'spin' : ''} />
+                        刷新
+                    </button>
+                </section>
+            )}
 
-            <section className="admin-key-grid ai">
+            {mode !== 'test' && <section className="admin-key-grid ai">
                 <div className={`admin-key-stat knowledge-health ${ragHealth?.status === 'ok' ? 'ok' : 'warn'}`}>
                     <span>RAG 服务</span>
                     <strong>{ragHealth?.status || '未知'}</strong>
@@ -272,10 +274,10 @@ const AdminKnowledge = () => {
                     <strong>{compactNumber(logs.length)}</strong>
                     <em>用于追溯 e仔回答依据</em>
                 </div>
-            </section>
+            </section>}
             {ragHealth?.last_error && <div className="admin-rag-health-error">RAG 最近错误：{ragHealth.last_error}</div>}
 
-            <div className="admin-knowledge-grid">
+            {mode !== 'test' && <div className="admin-knowledge-grid">
                 <section className="admin-panel">
                     <div className="admin-panel-head">
                         <div>
@@ -380,10 +382,10 @@ const AdminKnowledge = () => {
                         </div>
                     </section>
                 </aside>
-            </div>
+            </div>}
 
-            <div className="admin-knowledge-grid bottom">
-                <section className="admin-panel">
+            {mode !== 'documents' && <div className={`admin-knowledge-grid bottom ${mode === 'test' ? 'single' : ''}`}>
+                {mode === 'full' && <section className="admin-panel">
                     <div className="admin-panel-head">
                         <div>
                             <h2>片段预览</h2>
@@ -400,7 +402,7 @@ const AdminKnowledge = () => {
                             </article>
                         ))}
                     </div>
-                </section>
+                </section>}
 
                 <section className="admin-panel">
                     <div className="admin-panel-head">
@@ -433,9 +435,9 @@ const AdminKnowledge = () => {
                         </div>
                     )}
                 </section>
-            </div>
+            </div>}
 
-            <section className="admin-panel">
+            {mode === 'full' && <section className="admin-panel">
                 <div className="admin-panel-head">
                     <div>
                         <h2>最近 RAG 查询</h2>
@@ -469,7 +471,7 @@ const AdminKnowledge = () => {
                         </tbody>
                     </table>
                 </div>
-            </section>
+            </section>}
         </div>
     );
 };
