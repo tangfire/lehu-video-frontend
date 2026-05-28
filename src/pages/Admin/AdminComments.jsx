@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { FiMessageCircle, FiTrash2 } from 'react-icons/fi';
+import { FiCheckCircle, FiExternalLink, FiMessageCircle, FiTrash2 } from 'react-icons/fi';
 import { campusAdminApi } from '../../api/admin';
 import { statusText } from './adminUtils';
 import './Admin.css';
@@ -8,20 +8,23 @@ import './Admin.css';
 const AdminComments = () => {
     const [searchParams] = useSearchParams();
     const statusParam = searchParams.get('status') || '-1';
+    const postIDParam = searchParams.get('post_id') || '';
     const [comments, setComments] = useState([]);
     const [status, setStatus] = useState(statusParam);
+    const [postID, setPostID] = useState(postIDParam);
     const [page, setPage] = useState(1);
     const [total, setTotal] = useState(0);
     const [error, setError] = useState('');
     const [message, setMessage] = useState('');
     const [loading, setLoading] = useState(false);
+    const [actionLoading, setActionLoading] = useState(false);
     const [pendingDelete, setPendingDelete] = useState(null);
 
-    const load = async (nextPage = page, nextStatus = status) => {
+    const load = async (nextPage = page, nextStatus = status, nextPostID = postID) => {
         setLoading(true);
         setError('');
         try {
-            const data = await campusAdminApi.listComments({ page: nextPage, size: 20, status: nextStatus });
+            const data = await campusAdminApi.listComments({ page: nextPage, size: 20, status: nextStatus, post_id: nextPostID });
             setComments(data.comments || []);
             setTotal(data.page_stats?.total || 0);
             setPage(nextPage);
@@ -34,9 +37,10 @@ const AdminComments = () => {
 
     useEffect(() => {
         setStatus(statusParam);
-        load(1, statusParam);
+        setPostID(postIDParam);
+        load(1, statusParam, postIDParam);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [statusParam]);
+    }, [statusParam, postIDParam]);
 
     const showMessage = (text) => {
         setMessage(text);
@@ -45,13 +49,34 @@ const AdminComments = () => {
 
     const remove = async () => {
         if (!pendingDelete) return;
+        setActionLoading(true);
+        setError('');
         try {
             await campusAdminApi.deleteComment(pendingDelete.id);
             setPendingDelete(null);
-            showMessage('评论已删除');
+            showMessage('评论已下架');
             load(page);
         } catch (err) {
-            setError(err.message || '删除评论失败');
+            setError(err.message || '下架评论失败');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const reviewComment = async (comment, action) => {
+        setActionLoading(true);
+        setError('');
+        try {
+            await campusAdminApi.reviewComment(comment.id, {
+                action,
+                reason: action === 'visible' ? '后台恢复可见' : '后台下架评论',
+            });
+            showMessage(action === 'visible' ? '评论已恢复可见' : '评论已下架');
+            load(page);
+        } catch (err) {
+            setError(err.message || '评论状态更新失败');
+        } finally {
+            setActionLoading(false);
         }
     };
 
@@ -64,8 +89,9 @@ const AdminComments = () => {
                     <option value="1">可见</option>
                     <option value="0">待审核</option>
                     <option value="2">已拒绝</option>
-                    <option value="3">已删除</option>
+                    <option value="3">已下架</option>
                 </select>
+                <input className="admin-input" value={postID} onChange={(e) => setPostID(e.target.value)} placeholder="按帖子 ID 筛选，可留空" />
                 <button className="admin-button primary" onClick={() => load(1)}>查询</button>
             </div>
             {error && <div className="admin-error">{error}</div>}
@@ -97,7 +123,25 @@ const AdminComments = () => {
                                 <td>{statusText(comment.status)}</td>
                                 <td>{comment.created_at}</td>
                                 <td>
-                                    <button className="admin-button danger" onClick={() => setPendingDelete(comment)}><FiTrash2 /> 删除</button>
+                                    <div className="admin-actions">
+                                        {comment.post_id && (
+                                            <button className="admin-button" type="button" onClick={() => window.open(`/admin/posts?keyword=${encodeURIComponent(String(comment.post_id))}`, '_blank', 'noopener,noreferrer')}>
+                                                <FiExternalLink />
+                                                原帖
+                                            </button>
+                                        )}
+                                        {Number(comment.status) === 1 ? (
+                                            <button className="admin-button danger" onClick={() => setPendingDelete(comment)} disabled={actionLoading}>
+                                                <FiTrash2 />
+                                                下架
+                                            </button>
+                                        ) : (
+                                            <button className="admin-button" disabled={actionLoading} onClick={() => reviewComment(comment, 'visible')}>
+                                                <FiCheckCircle />
+                                                恢复可见
+                                            </button>
+                                        )}
+                                    </div>
                                 </td>
                             </tr>
                         ))}
@@ -113,11 +157,11 @@ const AdminComments = () => {
                 <div className="admin-modal-backdrop" role="presentation">
                     <div className="admin-confirm-modal">
                         <div className="admin-modal-icon"><FiTrash2 /></div>
-                        <h3>删除评论</h3>
-                        <p>确认删除这条评论吗？删除后前台将不再展示。</p>
+                        <h3>下架评论</h3>
+                        <p>确认下架这条评论吗？下架后前台将不再展示。</p>
                         <div className="admin-modal-actions">
                             <button className="admin-button" onClick={() => setPendingDelete(null)}>取消</button>
-                            <button className="admin-button danger" onClick={remove}>确认删除</button>
+                            <button className="admin-button danger" disabled={actionLoading} onClick={remove}>确认下架</button>
                         </div>
                     </div>
                 </div>

@@ -37,7 +37,7 @@ const statusOptions = [
     ['可见', '1'],
     ['待审核', '0'],
     ['已拒绝', '2'],
-    ['已删除', '3'],
+    ['已下架', '3'],
 ];
 
 const batchActions = [
@@ -47,7 +47,7 @@ const batchActions = [
     ['unfeature', '取消精选'],
     ['official', '设为官方'],
     ['unofficial', '取消官方'],
-    ['visible', '通过可见'],
+    ['visible', '恢复可见'],
     ['delete', '下架'],
 ];
 
@@ -125,8 +125,10 @@ const AdminPosts = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [initialStatus]);
 
-    const updateFilter = (key, value) => {
-        setFilters((prev) => ({ ...prev, [key]: value }));
+    const updateFilter = (key, value, autoLoad = false) => {
+        const next = { ...filters, [key]: value };
+        setFilters(next);
+        if (autoLoad) load(1, next);
     };
 
     const showMessage = (text) => {
@@ -207,12 +209,12 @@ const AdminPosts = () => {
                 </div>
                 <div className="admin-simple-filter-row">
                     <input className="admin-input" value={filters.keyword} onChange={(e) => updateFilter('keyword', e.target.value)} placeholder="搜索标题 / 正文" />
-                    <select className="admin-select" value={filters.status} onChange={(e) => updateFilter('status', e.target.value)}>
+                    <select className="admin-select" value={filters.status} onChange={(e) => updateFilter('status', e.target.value, true)}>
                         {statusOptions.map(([label, value]) => <option key={value} value={value}>{label}</option>)}
                     </select>
-                    <button className={filters.opsFilter === 'pinned' ? 'admin-button active' : 'admin-button'} type="button" onClick={() => updateFilter('opsFilter', filters.opsFilter === 'pinned' ? '' : 'pinned')}>只看置顶</button>
-                    <button className={filters.opsFilter === 'featured' ? 'admin-button active' : 'admin-button'} type="button" onClick={() => updateFilter('opsFilter', filters.opsFilter === 'featured' ? '' : 'featured')}>只看精选</button>
-                    <button className={filters.opsFilter === 'reported' ? 'admin-button active' : 'admin-button'} type="button" onClick={() => updateFilter('opsFilter', filters.opsFilter === 'reported' ? '' : 'reported')}>有举报</button>
+                    <button className={filters.opsFilter === 'pinned' ? 'admin-button active' : 'admin-button'} type="button" onClick={() => updateFilter('opsFilter', filters.opsFilter === 'pinned' ? '' : 'pinned', true)}>只看置顶</button>
+                    <button className={filters.opsFilter === 'featured' ? 'admin-button active' : 'admin-button'} type="button" onClick={() => updateFilter('opsFilter', filters.opsFilter === 'featured' ? '' : 'featured', true)}>只看精选</button>
+                    <button className={filters.opsFilter === 'reported' ? 'admin-button active' : 'admin-button'} type="button" onClick={() => updateFilter('opsFilter', filters.opsFilter === 'reported' ? '' : 'reported', true)}>有举报</button>
                     <button className="admin-button subtle" type="button" onClick={() => setShowAdvancedFilters((value) => !value)}>
                         高级筛选
                         <FiChevronDown className={showAdvancedFilters ? 'rotate' : ''} />
@@ -220,14 +222,14 @@ const AdminPosts = () => {
                 </div>
                 {showAdvancedFilters && (
                     <div className="admin-filter-grid advanced">
-                        <select className="admin-select" value={filters.postType} onChange={(e) => updateFilter('postType', e.target.value)}>
+                        <select className="admin-select" value={filters.postType} onChange={(e) => updateFilter('postType', e.target.value, true)}>
                             {postTypeOptions.map(([label, value]) => <option key={value} value={value}>{label}</option>)}
                         </select>
-                        <select className="admin-select" value={filters.categoryCode} onChange={(e) => updateFilter('categoryCode', e.target.value)}>
+                        <select className="admin-select" value={filters.categoryCode} onChange={(e) => updateFilter('categoryCode', e.target.value, true)}>
                             <option value="">全部版块</option>
                             {categories.map((item) => <option key={item.code} value={item.code}>{item.name}</option>)}
                         </select>
-                        <select className="admin-select" value={filters.opsFilter} onChange={(e) => updateFilter('opsFilter', e.target.value)}>
+                        <select className="admin-select" value={filters.opsFilter} onChange={(e) => updateFilter('opsFilter', e.target.value, true)}>
                             {opsOptions.map(([label, value]) => <option key={value} value={value}>{label}</option>)}
                         </select>
                     </div>
@@ -242,7 +244,7 @@ const AdminPosts = () => {
                 <div className="admin-batch-actions compact">
                     <button className="admin-button" type="button" disabled={actionLoading || selectedIds.length === 0} onClick={() => runBatch('pin')}>置顶</button>
                     <button className="admin-button" type="button" disabled={actionLoading || selectedIds.length === 0} onClick={() => runBatch('feature')}>精选</button>
-                    <button className="admin-button" type="button" disabled={actionLoading || selectedIds.length === 0} onClick={() => runBatch('visible')}>通过</button>
+                    <button className="admin-button" type="button" disabled={actionLoading || selectedIds.length === 0} onClick={() => runBatch('visible')}>恢复可见</button>
                     <button className="admin-button subtle" type="button" onClick={() => setShowBatchTools((value) => !value)}>
                         更多
                         <FiChevronDown className={showBatchTools ? 'rotate' : ''} />
@@ -316,7 +318,17 @@ const AdminPosts = () => {
                             <div className="admin-actions">
                                 <button className={post.is_pinned ? 'admin-button active' : 'admin-button'} disabled={actionLoading} onClick={() => updatePost(post, { is_pinned: !post.is_pinned })}>{post.is_pinned ? '置顶中' : '置顶'}</button>
                                 <button className={post.is_featured ? 'admin-button active' : 'admin-button'} disabled={actionLoading} onClick={() => updatePost(post, { is_featured: !post.is_featured })}>{post.is_featured ? '精选中' : '精选'}</button>
-                                <button className="admin-button" disabled={actionLoading} onClick={() => updatePost(post, { status: 1, audit_reason: '' }, '内容已设为可见')}><FiCheckCircle /> 可见</button>
+                                {Number(post.status) === 1 ? (
+                                    <button className="admin-button quiet" type="button" disabled>
+                                        <FiCheckCircle />
+                                        已可见
+                                    </button>
+                                ) : (
+                                    <button className="admin-button" disabled={actionLoading} onClick={() => updatePost(post, { status: 1, audit_reason: '' }, '内容已恢复可见')}>
+                                        <FiCheckCircle />
+                                        恢复可见
+                                    </button>
+                                )}
                                 <button className={post.is_official ? 'admin-button active quiet' : 'admin-button quiet'} disabled={actionLoading} onClick={() => updatePost(post, { is_official: !post.is_official })}>{post.is_official ? '官方' : '设官方'}</button>
                             </div>
                             <div className="admin-weight-editor">
@@ -328,9 +340,9 @@ const AdminPosts = () => {
                                         if (Number(e.target.value || 0) !== Number(post.sort_weight || 0)) saveWeight(post, e.target.value);
                                     }}
                                 />
-                                <button className="admin-button danger" disabled={actionLoading} onClick={() => setConfirmAction({ type: 'single', post, label: '下架内容' })}>
+                                <button className="admin-button danger" disabled={actionLoading || Number(post.status) === 3} onClick={() => setConfirmAction({ type: 'single', post, label: '下架内容' })}>
                                     <FiTrash2 />
-                                    下架
+                                    {Number(post.status) === 3 ? '已下架' : '下架'}
                                 </button>
                             </div>
                         </div>
@@ -352,7 +364,7 @@ const AdminPosts = () => {
                         <p>
                             {confirmAction.type === 'batch'
                                 ? `将对 ${selectedIds.length} 条内容执行「${confirmAction.label}」，操作后小程序首页会同步变化。`
-                                : `确认下架「${confirmAction.post?.title || '这条内容'}」吗？`}
+                                : `确认下架「${confirmAction.post?.title || '这条内容'}」吗？下架后前台不再展示，可通过「恢复可见」重新上架。`}
                         </p>
                         <div className="admin-modal-actions">
                             <button className="admin-button" onClick={() => setConfirmAction(null)}>取消</button>

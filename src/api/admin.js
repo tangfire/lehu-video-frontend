@@ -15,6 +15,7 @@ export const campusAdminApi = {
     },
     listComments: (params) => request.get('/campus/admin/comments', { params }),
     deleteComment: (id) => request.delete(`/campus/admin/comments/${id}`),
+    reviewComment: (id, data) => request.post(`/campus/moderation/comments/${id}/review`, data),
     listReports: (params) => request.get('/campus/admin/reports', { params }),
     reviewReport: (id, data) => request.post(`/campus/admin/reports/${id}/review`, data),
     listFeedback: (params) => request.get('/campus/admin/feedback', { params }),

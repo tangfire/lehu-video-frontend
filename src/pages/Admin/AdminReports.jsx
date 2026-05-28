@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { FiFlag } from 'react-icons/fi';
+import { FiExternalLink, FiFlag, FiTrash2 } from 'react-icons/fi';
 import { campusAdminApi } from '../../api/admin';
 import './Admin.css';
 
@@ -19,6 +19,8 @@ const AdminReports = () => {
     const [error, setError] = useState('');
     const [message, setMessage] = useState('');
     const [loading, setLoading] = useState(false);
+    const [actionLoading, setActionLoading] = useState(false);
+    const [confirmAction, setConfirmAction] = useState(null);
 
     const load = async (nextPage = page, nextStatus = status) => {
         setLoading(true);
@@ -42,13 +44,80 @@ const AdminReports = () => {
     }, [statusParam]);
 
     const review = async (report, action) => {
+        setActionLoading(true);
+        setError('');
         try {
             await campusAdminApi.reviewReport(report.id, { action, reason: action === 'resolve' ? '已处理' : '已驳回' });
-            setMessage(action === 'resolve' ? '举报已标记处理' : '举报已驳回');
+            setMessage(action === 'resolve' ? '举报已设为已处理' : '举报已驳回');
             window.setTimeout(() => setMessage(''), 2400);
             load(page);
         } catch (err) {
             setError(err.message || '处理举报失败');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const targetPostID = (report) => {
+        if (!report) return '';
+        if (report.target_type === 'post') return report.target_id;
+        return report.comment?.post_id || report.comment?.post?.id || '';
+    };
+
+    const openTarget = (report) => {
+        const postID = targetPostID(report);
+        if (!postID) {
+            setError('找不到关联帖子');
+            return;
+        }
+        if (report.target_type === 'comment') {
+            window.open(`/admin/comments?post_id=${encodeURIComponent(String(postID))}`, '_blank', 'noopener,noreferrer');
+            return;
+        }
+        window.open(`/admin/posts?keyword=${encodeURIComponent(String(postID))}`, '_blank', 'noopener,noreferrer');
+    };
+
+    const takedownTarget = async () => {
+        if (!confirmAction?.report) return;
+        const { report } = confirmAction;
+        setActionLoading(true);
+        setError('');
+        try {
+            if (report.target_type === 'post') {
+                const target = report.target;
+                if (target) {
+                    await campusAdminApi.updatePost(report.target_id, {
+                        category_code: target.category_code,
+                        title: target.title,
+                        content: target.content,
+                        images: target.images || [],
+                        media_type: target.media_type || 'text',
+                        post_type: target.post_type || 'note',
+                        extra: target.extra || {},
+                        cover_url: target.cover_url || '',
+                        video_url: target.video_url || '',
+                        status: 3,
+                        audit_reason: '举报处理下架',
+                        is_official: Boolean(target.is_official),
+                        is_featured: Boolean(target.is_featured),
+                        is_pinned: Boolean(target.is_pinned),
+                        sort_weight: Number(target.sort_weight || 0),
+                    });
+                } else {
+                    await campusAdminApi.deletePost(report.target_id);
+                }
+            } else {
+                await campusAdminApi.deleteComment(report.target_id);
+            }
+            await campusAdminApi.reviewReport(report.id, { action: 'resolve', reason: '已下架举报对象' });
+            setMessage('举报对象已下架，举报已设为已处理');
+            window.setTimeout(() => setMessage(''), 2400);
+            setConfirmAction(null);
+            load(page);
+        } catch (err) {
+            setError(err.message || '下架举报对象失败');
+        } finally {
+            setActionLoading(false);
         }
     };
 
@@ -100,8 +169,10 @@ const AdminReports = () => {
                                 <td>{report.created_at}</td>
                                 <td>
                                     <div className="admin-actions">
-                                        <button className="admin-button" onClick={() => review(report, 'resolve')}>标记处理</button>
-                                        <button className="admin-button" onClick={() => review(report, 'reject')}>驳回</button>
+                                        <button className="admin-button" onClick={() => openTarget(report)}><FiExternalLink /> 查看</button>
+                                        <button className="admin-button danger" disabled={actionLoading} onClick={() => setConfirmAction({ report })}><FiTrash2 /> 下架对象</button>
+                                        <button className="admin-button" disabled={actionLoading || Number(report.status) === 1} onClick={() => review(report, 'resolve')}>设为已处理</button>
+                                        <button className="admin-button" disabled={actionLoading || Number(report.status) === 2} onClick={() => review(report, 'reject')}>驳回举报</button>
                                     </div>
                                 </td>
                             </tr>
@@ -114,6 +185,19 @@ const AdminReports = () => {
                 <button className="admin-button" disabled={page <= 1} onClick={() => load(page - 1)}>上一页</button>
                 <button className="admin-button" disabled={page * 20 >= total} onClick={() => load(page + 1)}>下一页</button>
             </div>
+            {confirmAction && (
+                <div className="admin-modal-backdrop" role="presentation">
+                    <div className="admin-confirm-modal">
+                        <div className="admin-modal-icon"><FiTrash2 /></div>
+                        <h3>下架举报对象</h3>
+                        <p>确认下架这条举报对应的{confirmAction.report?.target_type === 'post' ? '帖子' : '评论'}吗？下架后前台不再展示，举报会同时设为已处理。</p>
+                        <div className="admin-modal-actions">
+                            <button className="admin-button" onClick={() => setConfirmAction(null)}>取消</button>
+                            <button className="admin-button danger" disabled={actionLoading} onClick={takedownTarget}>确认下架</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 };

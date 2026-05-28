@@ -3,7 +3,7 @@ export const statusText = (status) => {
         0: '待审核',
         1: '可见',
         2: '已拒绝',
-        3: '已删除',
+        3: '已下架',
     };
     return map[Number(status)] || '未知';
 };

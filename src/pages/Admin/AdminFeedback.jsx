@@ -52,7 +52,7 @@ const AdminFeedback = () => {
         const note = nextStatus === 2 ? '已处理' : '正在跟进';
         try {
             await campusAdminApi.reviewFeedback(item.id, { status: nextStatus, operator_note: note });
-            setMessage(nextStatus === 2 ? '反馈已标记处理' : '反馈已标记跟进');
+            setMessage(nextStatus === 2 ? '反馈已设为已处理' : '反馈已设为处理中');
             window.setTimeout(() => setMessage(''), 2400);
             load(page);
         } catch (err) {
@@ -106,8 +106,8 @@ const AdminFeedback = () => {
                                 )}
                             </div>
                             <div className="admin-feedback-actions">
-                                <button className="admin-button" disabled={Number(item.status) === 1} onClick={() => review(item, 1)}>标记跟进</button>
-                                <button className="admin-button primary" disabled={Number(item.status) === 2} onClick={() => review(item, 2)}>标记处理</button>
+                                <button className="admin-button" disabled={Number(item.status) === 1} onClick={() => review(item, 1)}>设为处理中</button>
+                                <button className="admin-button primary" disabled={Number(item.status) === 2} onClick={() => review(item, 2)}>设为已处理</button>
                             </div>
                         </article>
                     ))}
