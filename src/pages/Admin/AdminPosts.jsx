@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { FiCheckCircle, FiChevronDown, FiImage, FiMoreHorizontal, FiSearch, FiTrash2, FiVideo } from 'react-icons/fi';
+import { Link, useSearchParams } from 'react-router-dom';
+import { FiCheckCircle, FiChevronDown, FiImage, FiMoreHorizontal, FiSearch, FiShield, FiTrash2, FiVideo } from 'react-icons/fi';
 import { campusAdminApi } from '../../api/admin';
 import { compactNumber, excerpt, mediaTypeText, postCover, postTypeText, statusText } from './adminUtils';
 import './Admin.css';
@@ -50,6 +50,16 @@ const batchActions = [
     ['visible', '恢复可见'],
     ['delete', '下架'],
 ];
+
+const aiRiskText = (risk) => {
+    const map = { low: '低风险', medium: '需复核', high: '高风险' };
+    return map[risk] || '';
+};
+
+const aiDecisionText = (decision) => {
+    const map = { pass: '建议通过', review: '建议复核', reject: '疑似违规' };
+    return map[decision] || '';
+};
 
 const buildPostPayload = (post, patch) => ({
     category_code: post.category_code,
@@ -206,6 +216,10 @@ const AdminPosts = () => {
                         <FiSearch />
                         查询
                     </button>
+                    <Link className="admin-button" to="/admin/assistant?tab=audit">
+                        <FiShield />
+                        审核设置
+                    </Link>
                 </div>
                 <div className="admin-simple-filter-row">
                     <input className="admin-input" value={filters.keyword} onChange={(e) => updateFilter('keyword', e.target.value)} placeholder="搜索标题 / 正文" />
@@ -313,6 +327,15 @@ const AdminPosts = () => {
                                 <span>权重 {post.sort_weight || 0}</span>
                                 <span>{post.created_at}</span>
                             </div>
+                            {(post.audit_reason || post.ai_audit_reason || post.ai_audit_error) && (
+                                <div className={`admin-audit-note ${post.ai_audit_risk ? `risk-${post.ai_audit_risk}` : ''}`}>
+                                    <FiShield />
+                                    <span>
+                                        {post.ai_audit_status && `AI ${aiDecisionText(post.ai_audit_decision) || post.ai_audit_status}${aiRiskText(post.ai_audit_risk) ? ` · ${aiRiskText(post.ai_audit_risk)}` : ''}：`}
+                                        {post.ai_audit_reason || post.ai_audit_error || post.audit_reason}
+                                    </span>
+                                </div>
+                            )}
                         </div>
                         <div className="admin-post-ops">
                             <div className="admin-actions">

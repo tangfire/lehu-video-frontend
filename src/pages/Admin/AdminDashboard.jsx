@@ -150,9 +150,13 @@ const AdminDashboard = () => {
                             <strong>{compactNumber(summary.pending_feedback || 0)}</strong>
                             <span>待跟进反馈</span>
                         </Link>
+                        <Link className="admin-risk-row" to="/admin/posts?status=0">
+                            <strong>{compactNumber(summary.pending_posts || 0)}</strong>
+                            <span>待审核帖子</span>
+                        </Link>
                         <Link className="admin-risk-row" to="/admin/assistant?tab=failed">
-                            <strong>{compactNumber(aiSummary?.failed || 0)}</strong>
-                            <span>e仔失败任务</span>
+                            <strong>{compactNumber((aiSummary?.failed || 0) + (summary.pending_ai_audits || 0))}</strong>
+                            <span>AI / e仔任务</span>
                         </Link>
                     </div>
                 </div>

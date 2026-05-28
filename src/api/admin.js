@@ -2,6 +2,8 @@ import request from '../utils/request';
 
 export const campusAdminApi = {
     summary: () => request.get('/campus/admin/summary'),
+    getAuditSettings: () => request.get('/campus/admin/settings/audit'),
+    updateAuditSettings: (data) => request.put('/campus/admin/settings/audit', data),
     reconcileStats: () => request.post('/campus/admin/stats/reconcile'),
     listPosts: (params) => request.get('/campus/admin/posts', { params }),
     createPost: (data) => request.post('/campus/admin/posts', data),
