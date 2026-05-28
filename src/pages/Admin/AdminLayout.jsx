@@ -15,6 +15,12 @@ const navItems = [
     { to: '/admin/permissions', label: '权限管理', icon: <FiKey /> },
 ];
 
+const navGroups = [
+    { title: '运营增长', items: navItems.slice(0, 3) },
+    { title: '内容治理', items: navItems.slice(3, 6) },
+    { title: '用户与安全', items: navItems.slice(6) },
+];
+
 const titleMap = {
     '/admin': '数据总览',
     '/admin/posts': '内容工作台',
@@ -25,6 +31,18 @@ const titleMap = {
     '/admin/security': '安全中心',
     '/admin/users': '用户管理',
     '/admin/permissions': '权限管理',
+};
+
+const subtitleMap = {
+    '/admin': '先看待办、流量、互动和风险，再决定今天要发什么内容。',
+    '/admin/posts': '管理首页内容流，处理置顶、精选、下架和内容状态。',
+    '/admin/compose': '用深汕e仔发布官方内容，也可以给内测用户发系统通知。',
+    '/admin/comments': '处理评论可见性，查看评论来源和关联原帖。',
+    '/admin/reports': '按举报对象处理内容风险，必要时下架帖子或评论。',
+    '/admin/feedback': '收集用户建议和问题反馈，标记跟进状态。',
+    '/admin/security': '查看请求、限流、异常 IP 和接口访问情况。',
+    '/admin/users': '查看用户画像、活跃、内容贡献和风险记录。',
+    '/admin/permissions': '集中分配运营和管理员权限，避免在用户管理里误操作。',
 };
 
 const AdminLayout = () => {
@@ -51,11 +69,16 @@ const AdminLayout = () => {
                         <div className="admin-brand-subtitle">运营控制台</div>
                     </div>
                     <nav className="admin-nav">
-                        {navItems.map((item) => (
-                            <NavLink key={item.to} to={item.to} end={item.end}>
-                                {item.icon}
-                                {item.label}
-                            </NavLink>
+                        {navGroups.map((group) => (
+                            <div className="admin-nav-group" key={group.title}>
+                                <span className="admin-nav-group-title">{group.title}</span>
+                                {group.items.map((item) => (
+                                    <NavLink key={item.to} to={item.to} end={item.end}>
+                                        {item.icon}
+                                        {item.label}
+                                    </NavLink>
+                                ))}
+                            </div>
                         ))}
                     </nav>
                 </aside>
@@ -63,7 +86,7 @@ const AdminLayout = () => {
                     <header className="admin-topbar">
                         <div>
                             <h1>{titleMap[location.pathname] || '后台管理'}</h1>
-                            <p>深汕e仔官方内容、社区秩序和增长数据都在这里处理。</p>
+                            <p>{subtitleMap[location.pathname] || '深汕e仔官方内容、社区秩序和增长数据都在这里处理。'}</p>
                         </div>
                         <div className="admin-user">
                             <span>{user?.nickname || user?.name || '运营同学'}</span>

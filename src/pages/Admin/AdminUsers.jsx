@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { FiAlertCircle, FiAward, FiClock, FiMessageCircle, FiRefreshCw, FiSearch, FiShield, FiUserCheck, FiUsers } from 'react-icons/fi';
 import { campusAdminApi } from '../../api/admin';
 import { compactNumber, roleText } from './adminUtils';
@@ -87,9 +88,15 @@ const AdminUsers = () => {
                     <h2>用户工作台</h2>
                     <p>用来识别活跃同学、内容贡献和需要跟进的反馈/举报用户。角色调整请去权限管理。</p>
                 </div>
-                <button className="admin-button" onClick={() => load(page)} disabled={loading}>
-                    <FiRefreshCw className={loading ? 'spin' : ''} /> 刷新
-                </button>
+                <div className="admin-head-actions">
+                    <Link className="admin-button" to="/admin/permissions">
+                        <FiShield />
+                        权限管理
+                    </Link>
+                    <button className="admin-button" onClick={() => load(page)} disabled={loading}>
+                        <FiRefreshCw className={loading ? 'spin' : ''} /> 刷新
+                    </button>
+                </div>
             </section>
 
             <section className="admin-user-stat-grid">

@@ -14,9 +14,9 @@ const roleOptions = [
 ];
 
 const roleActions = [
-    ['operator', '设为运营', '可进入后台处理内容、评论、举报和反馈'],
-    ['admin', '设为管理员', '可调整其他用户后台权限，建议只给核心成员'],
-    ['user', '移除权限', '恢复为普通用户，不能再进入运营后台'],
+    ['operator', '升级为运营', '可进入后台处理内容、评论、举报和反馈'],
+    ['admin', '升级为管理员', '可调整其他用户后台权限，建议只给核心成员'],
+    ['user', '移除后台权限', '恢复为普通用户，不能再进入运营后台'],
 ];
 
 const AdminPermissions = () => {
@@ -28,6 +28,7 @@ const AdminPermissions = () => {
     const [error, setError] = useState('');
     const [message, setMessage] = useState('');
     const [confirmAction, setConfirmAction] = useState(null);
+    const [actionLoading, setActionLoading] = useState(false);
 
     const load = async (nextPage = page, nextFilters = filters) => {
         setLoading(true);
@@ -75,6 +76,9 @@ const AdminPermissions = () => {
     };
 
     const updateRole = async (item, role) => {
+        if (actionLoading) return;
+        setActionLoading(true);
+        setError('');
         try {
             await campusAdminApi.updateUserRole(item.user.id, role);
             setMessage(`已将 ${displayName(item)} 更新为${roleText(role)}`);
@@ -83,6 +87,8 @@ const AdminPermissions = () => {
             load(page);
         } catch (err) {
             setError(err.message || '更新权限失败');
+        } finally {
+            setActionLoading(false);
         }
     };
 
@@ -104,22 +110,22 @@ const AdminPermissions = () => {
                 <FiAlertTriangle />
                 <div>
                     <strong>谨慎授予管理员权限</strong>
-                    <span>管理员可以继续分配权限；运营只负责内容、反馈、举报等日常工作。正式上线前应关闭本地开发的全员管理员开关。</span>
+                    <span>管理员可以继续分配权限；运营只负责内容、反馈、举报等日常工作。正式上线前必须关闭本地开发的全员管理员开关。</span>
                 </div>
             </section>
 
             <section className="admin-user-stat-grid permission">
                 <div className="admin-user-stat">
                     <span><FiShield /></span>
-                    <div><em>当前页管理员</em><strong>{counts.admins}</strong><small>最高权限</small></div>
+                    <div><em>本页管理员</em><strong>{counts.admins}</strong><small>最高权限</small></div>
                 </div>
                 <div className="admin-user-stat">
                     <span><FiUserCheck /></span>
-                    <div><em>当前页运营</em><strong>{counts.operators}</strong><small>日常后台权限</small></div>
+                    <div><em>本页运营</em><strong>{counts.operators}</strong><small>日常后台权限</small></div>
                 </div>
                 <div className="admin-user-stat">
                     <span><FiUsers /></span>
-                    <div><em>当前页普通用户</em><strong>{counts.normal}</strong><small>无后台权限</small></div>
+                    <div><em>本页普通用户</em><strong>{counts.normal}</strong><small>无后台权限</small></div>
                 </div>
             </section>
 
@@ -147,7 +153,7 @@ const AdminPermissions = () => {
             {!loading && users.length > 0 && (
                 <div className="admin-permission-list">
                     {users.map((item) => (
-                        <PermissionRow item={item} key={item.user.id} onRole={(role) => setConfirmAction({ item, role })} />
+                        <PermissionRow item={item} key={item.user.id} actionLoading={actionLoading} onRole={(role) => setConfirmAction({ item, role })} />
                     ))}
                 </div>
             )}
@@ -162,6 +168,7 @@ const AdminPermissions = () => {
                 <RoleConfirmModal
                     item={confirmAction.item}
                     role={confirmAction.role}
+                    loading={actionLoading}
                     onCancel={() => setConfirmAction(null)}
                     onConfirm={() => updateRole(confirmAction.item, confirmAction.role)}
                 />
@@ -170,7 +177,7 @@ const AdminPermissions = () => {
     );
 };
 
-const PermissionRow = ({ item, onRole }) => {
+const PermissionRow = ({ item, actionLoading, onRole }) => {
     const user = item.user || {};
     const role = item.role || 'user';
     const name = displayName(item);
@@ -192,7 +199,7 @@ const PermissionRow = ({ item, onRole }) => {
                 {roleActions.map(([nextRole, label, title]) => (
                     <button
                         className={`admin-button ${nextRole === 'user' ? 'danger' : ''}`}
-                        disabled={nextRole === role}
+                        disabled={actionLoading || nextRole === role}
                         title={title}
                         key={nextRole}
                         onClick={() => onRole(nextRole)}
@@ -205,17 +212,21 @@ const PermissionRow = ({ item, onRole }) => {
     );
 };
 
-const RoleConfirmModal = ({ item, role, onCancel, onConfirm }) => {
+const RoleConfirmModal = ({ item, role, loading, onCancel, onConfirm }) => {
     const action = roleActions.find(([value]) => value === role);
+    const isAdmin = role === 'admin';
     return (
         <div className="admin-modal-backdrop" role="presentation">
             <div className="admin-confirm-modal">
                 <div className="admin-modal-icon"><FiShield /></div>
                 <h3>确认调整权限？</h3>
                 <p>将「{displayName(item)}」更新为「{roleText(role)}」。{action ? action[2] : ''}</p>
+                {isAdmin && <p className="admin-confirm-warning">管理员权限很高，建议只给核心成员和技术负责人。</p>}
                 <div className="admin-modal-actions">
-                    <button className="admin-button" onClick={onCancel}>取消</button>
-                    <button className={`admin-button ${role === 'user' ? 'danger' : 'primary'}`} onClick={onConfirm}>确认</button>
+                    <button className="admin-button" disabled={loading} onClick={onCancel}>取消</button>
+                    <button className={`admin-button ${role === 'user' ? 'danger' : 'primary'}`} disabled={loading} onClick={onConfirm}>
+                        {loading ? '处理中...' : '确认'}
+                    </button>
                 </div>
             </div>
         </div>

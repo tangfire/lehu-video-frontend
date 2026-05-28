@@ -259,7 +259,19 @@
 
 .admin-nav {
     display: grid;
+    gap: 16px;
+}
+
+.admin-nav-group {
+    display: grid;
     gap: 6px;
+}
+
+.admin-nav-group-title {
+    padding: 0 12px;
+    color: #94a3b8;
+    font-size: 12px;
+    font-weight: 950;
 }
 
 .admin-nav a {
@@ -1891,6 +1903,16 @@
     line-height: 1.6;
 }
 
+.admin-confirm-warning {
+    margin-top: 10px !important;
+    padding: 10px 12px;
+    border-radius: 6px;
+    background: #fff7ed;
+    color: #9a3412 !important;
+    font-weight: 800;
+    text-align: left;
+}
+
 .admin-modal-actions {
     display: flex;
     justify-content: center;
@@ -1935,6 +1957,15 @@
 
     .admin-nav {
         grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+    }
+
+    .admin-nav-group {
+        min-width: 0;
+    }
+
+    .admin-nav-group-title {
+        padding: 0 8px;
     }
 
     .admin-two-column,
