@@ -80,7 +80,7 @@ const AdminNotifications = () => {
                 link_params: parseNoticeParams(notice),
                 audience: notice.audience || 'all_users',
             });
-            setMessage('系统通知已发送到小程序消息中心');
+            setMessage('系统通知已加入发送队列，稍后会出现在小程序消息中心');
             setNotice(initialNotice);
         } catch (err) {
             setError(err.message || '系统通知发送失败');
