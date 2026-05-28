@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { FiArrowRight, FiEdit3, FiFileText, FiFlag, FiMessageCircle, FiSend, FiStar } from 'react-icons/fi';
+import { FiArrowRight, FiEdit3, FiFileText, FiFlag, FiMessageCircle, FiRefreshCw, FiSend, FiStar } from 'react-icons/fi';
 import { campusAdminApi } from '../../api/admin';
 import { compactNumber, excerpt, postCover, postTypeText, ratioText } from './adminUtils';
 import './Admin.css';
@@ -9,6 +9,8 @@ const AdminDashboard = () => {
     const [summary, setSummary] = useState(null);
     const [hotPosts, setHotPosts] = useState([]);
     const [error, setError] = useState('');
+    const [reconcileLoading, setReconcileLoading] = useState(false);
+    const [reconcileResult, setReconcileResult] = useState(null);
 
     useEffect(() => {
         let mounted = true;
@@ -64,6 +66,22 @@ const AdminDashboard = () => {
         return items.length > 0 ? items : [{ icon: <FiStar />, title: '今天状态不错', detail: '没有紧急待办，可以继续准备种子内容', to: '/admin/compose' }];
     }, [summary]);
 
+    const handleReconcileStats = async () => {
+        if (reconcileLoading) return;
+        setReconcileLoading(true);
+        setError('');
+        try {
+            const data = await campusAdminApi.reconcileStats();
+            setReconcileResult(data.result || {});
+            const summaryData = await campusAdminApi.summary();
+            setSummary(summaryData.summary || {});
+        } catch (err) {
+            setError(err.message || '计数对账失败');
+        } finally {
+            setReconcileLoading(false);
+        }
+    };
+
     if (error) return <div className="admin-error">{error}</div>;
     if (!summary) return <div className="admin-loading">数据加载中...</div>;
 
@@ -76,6 +94,10 @@ const AdminDashboard = () => {
                     <p>开学前后台只需要盯住内容供给、互动和审核风险。</p>
                 </div>
                 <div className="admin-head-actions">
+                    <button className="admin-button" type="button" onClick={handleReconcileStats} disabled={reconcileLoading}>
+                        <FiRefreshCw className={reconcileLoading ? 'spin' : ''} />
+                        计数对账
+                    </button>
                     <Link className="admin-button primary" to="/admin/compose">
                         <FiEdit3 />
                         发官方帖
@@ -113,6 +135,21 @@ const AdminDashboard = () => {
                     <span>新增举报</span>
                     <strong>{compactNumber(summary.today_reports)}</strong>
                 </div>
+            </section>
+
+            <section className="admin-ops-note">
+                <div>
+                    <strong>互动计数对账</strong>
+                    <span>从真实点赞、收藏、评论、回复关系表重新聚合，修正列表冗余计数。</span>
+                </div>
+                {reconcileResult ? (
+                    <em>
+                        已修正 {compactNumber(reconcileResult.updated_posts || 0)} 篇帖子、
+                        {compactNumber(reconcileResult.updated_comments || 0)} 条评论
+                    </em>
+                ) : (
+                    <em>建议发布高峰后手动跑一次。</em>
+                )}
             </section>
 
             <section className="admin-two-column simple">

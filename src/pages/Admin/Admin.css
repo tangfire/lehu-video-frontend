@@ -173,6 +173,20 @@
     transform: rotate(180deg);
 }
 
+.spin {
+    animation: admin-spin 0.9s linear infinite;
+}
+
+@keyframes admin-spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
 .admin-button:disabled {
     cursor: not-allowed;
     opacity: 0.58;
@@ -398,6 +412,33 @@
 
 .admin-funnel-strip strong {
     font-size: 22px;
+}
+
+.admin-ops-note {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 16px 18px;
+    border: 1px solid #ffd3d9;
+    border-radius: 8px;
+    background: #fff8f9;
+}
+
+.admin-ops-note div {
+    display: grid;
+    gap: 4px;
+}
+
+.admin-ops-note strong {
+    font-size: 15px;
+}
+
+.admin-ops-note span,
+.admin-ops-note em {
+    color: var(--admin-muted);
+    font-size: 13px;
+    font-style: normal;
 }
 
 .admin-panel {
