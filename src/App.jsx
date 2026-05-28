@@ -1,5 +1,5 @@
 // App.jsx
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { ChatProvider } from './context/chatContext';
 import { WebSocketProvider } from './components/WebSocket/WebSocketProvider';
 import MainLayout from './components/Layout/MainLayout';
@@ -36,12 +36,26 @@ import AdminNotifications from './pages/Admin/AdminNotifications.jsx';
 import AdminAIReplies from './pages/Admin/AdminAIReplies.jsx';
 import AdminKnowledge from './pages/Admin/AdminKnowledge.jsx';
 
+function AppProviders({ children }) {
+    const location = useLocation();
+    const isAdminRoute = location.pathname.startsWith('/admin');
+
+    if (isAdminRoute) {
+        return <ChatProvider>{children}</ChatProvider>;
+    }
+
+    return (
+        <ChatProvider>
+            <WebSocketProvider>{children}</WebSocketProvider>
+        </ChatProvider>
+    );
+}
+
 function App() {
     return (
         <Router>
-            <ChatProvider>
-                <WebSocketProvider>
-                    <Routes>
+            <AppProviders>
+                <Routes>
                         <Route path="/" element={<MainLayout />}>
                             <Route index element={<Home />} />
                             <Route path="video/:id" element={<VideoDetail />} />
@@ -124,9 +138,8 @@ function App() {
                             <Route path="permissions" element={<AdminPermissions />} />
                         </Route>
                         <Route path="*" element={<Navigate to="/" replace />} />
-                    </Routes>
-                </WebSocketProvider>
-            </ChatProvider>
+                </Routes>
+            </AppProviders>
         </Router>
     );
 }
