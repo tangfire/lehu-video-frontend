@@ -1941,6 +1941,10 @@
     font-size: 12px;
 }
 
+.admin-knowledge-doc-main .admin-knowledge-validity {
+    color: #8f5b17;
+}
+
 .admin-knowledge-doc-actions {
     display: flex;
     align-items: flex-start;

@@ -34,6 +34,19 @@ const initialManual = {
     content_type: 'text',
     raw_content: '',
     status: 'active',
+    effective_at: '',
+    expired_at: '',
+};
+
+const formatDateTimeLocal = (value) => {
+    if (!value) return '';
+    return value.replace(' ', 'T').slice(0, 16);
+};
+
+const toISOStringOrEmpty = (value) => {
+    if (!value) return '';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? '' : date.toISOString();
 };
 
 const AdminKnowledge = ({ mode = 'full' }) => {
@@ -47,7 +60,7 @@ const AdminKnowledge = ({ mode = 'full' }) => {
     const [page, setPage] = useState(1);
     const [total, setTotal] = useState(0);
     const [manual, setManual] = useState(initialManual);
-    const [uploadMeta, setUploadMeta] = useState({ title: '', source: '学校官方资料', category: 'general' });
+    const [uploadMeta, setUploadMeta] = useState({ title: '', source: '学校官方资料', category: 'general', effective_at: '', expired_at: '' });
     const [testQuery, setTestQuery] = useState('');
     const [testResult, setTestResult] = useState(null);
     const [ragHealth, setRagHealth] = useState(null);
@@ -125,7 +138,11 @@ const AdminKnowledge = ({ mode = 'full' }) => {
         setError('');
         setToast('');
         try {
-            const data = await campusAdminApi.createKnowledgeDocument(manual);
+            const data = await campusAdminApi.createKnowledgeDocument({
+                ...manual,
+                effective_at: toISOStringOrEmpty(manual.effective_at),
+                expired_at: toISOStringOrEmpty(manual.expired_at),
+            });
             setToast('已录入并开始索引');
             setManual(initialManual);
             await loadDocuments(1);
@@ -155,9 +172,11 @@ const AdminKnowledge = ({ mode = 'full' }) => {
                 file_id: uploaded.file_id,
                 file_type: uploaded.file_type,
                 status: 'active',
+                effective_at: toISOStringOrEmpty(uploadMeta.effective_at),
+                expired_at: toISOStringOrEmpty(uploadMeta.expired_at),
             });
             setToast('文档已上传并开始索引');
-            setUploadMeta({ title: '', source: '学校官方资料', category: uploadMeta.category || 'general' });
+            setUploadMeta({ title: '', source: '学校官方资料', category: uploadMeta.category || 'general', effective_at: '', expired_at: '' });
             await loadDocuments(1);
             if (data.document) await selectDoc(data.document);
         } catch (err) {
@@ -178,6 +197,8 @@ const AdminKnowledge = ({ mode = 'full' }) => {
                 source: doc.source,
                 category: doc.category,
                 status: nextStatus,
+                effective_at: doc.effective_at,
+                expired_at: doc.expired_at,
             });
             setToast(nextStatus === 'disabled' ? '已下架知识文档' : '已启用知识文档');
             await loadDocuments(page);
@@ -189,6 +210,12 @@ const AdminKnowledge = ({ mode = 'full' }) => {
         }
     };
 
+    const refreshSelectedDoc = async () => {
+        if (!selectedDoc || working) return;
+        await selectDoc(selectedDoc);
+        await loadDocuments(page);
+    };
+
     const reindex = async (doc) => {
         if (working) return;
         setWorking(doc.id);
@@ -196,7 +223,7 @@ const AdminKnowledge = ({ mode = 'full' }) => {
         setToast('');
         try {
             const data = await campusAdminApi.reindexKnowledgeDocument(doc.id);
-            setToast('已完成重新索引');
+            setToast('已开始重新索引');
             await loadDocuments(page);
             if (data.document) await selectDoc(data.document);
         } catch (err) {
@@ -314,6 +341,11 @@ const AdminKnowledge = ({ mode = 'full' }) => {
                                     </div>
                                     <strong>{doc.title}</strong>
                                     <p>{doc.source || '未填写来源'} · {doc.chunk_count || 0} 个片段 · {doc.updated_at}</p>
+                                    {(doc.effective_at || doc.expired_at) && (
+                                        <p className="admin-knowledge-validity">
+                                            生效 {doc.effective_at || '立即'} · 失效 {doc.expired_at || '长期'}
+                                        </p>
+                                    )}
                                     {doc.error_message && <div className="admin-ai-error">{doc.error_message}</div>}
                                 </div>
                                 <div className="admin-knowledge-doc-actions" onClick={(e) => e.stopPropagation()}>
@@ -351,6 +383,10 @@ const AdminKnowledge = ({ mode = 'full' }) => {
                             <select className="admin-select" value={uploadMeta.category} onChange={(e) => setUploadMeta((prev) => ({ ...prev, category: e.target.value }))}>
                                 {categories.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                             </select>
+                            <div className="admin-form two">
+                                <input className="admin-input" type="datetime-local" value={formatDateTimeLocal(uploadMeta.effective_at)} onChange={(e) => setUploadMeta((prev) => ({ ...prev, effective_at: e.target.value }))} />
+                                <input className="admin-input" type="datetime-local" value={formatDateTimeLocal(uploadMeta.expired_at)} onChange={(e) => setUploadMeta((prev) => ({ ...prev, expired_at: e.target.value }))} />
+                            </div>
                             <label className={`admin-upload-button ${working === 'upload' ? 'disabled' : ''}`}>
                                 <FiUploadCloud />
                                 {working === 'upload' ? '上传并索引中...' : '选择文件上传'}
@@ -374,6 +410,10 @@ const AdminKnowledge = ({ mode = 'full' }) => {
                                     {categories.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                                 </select>
                             </div>
+                            <div className="admin-form two">
+                                <input className="admin-input" type="datetime-local" value={formatDateTimeLocal(manual.effective_at)} onChange={(e) => setManual((prev) => ({ ...prev, effective_at: e.target.value }))} />
+                                <input className="admin-input" type="datetime-local" value={formatDateTimeLocal(manual.expired_at)} onChange={(e) => setManual((prev) => ({ ...prev, expired_at: e.target.value }))} />
+                            </div>
                             <textarea className="admin-textarea" value={manual.raw_content} onChange={(e) => setManual((prev) => ({ ...prev, raw_content: e.target.value }))} placeholder="录入已确认的校园信息..." />
                             <button className="admin-button primary" type="button" onClick={createManual} disabled={working === 'manual'}>
                                 <FiCheckCircle />
@@ -391,6 +431,12 @@ const AdminKnowledge = ({ mode = 'full' }) => {
                             <h2>片段预览</h2>
                             <p>{selectedDoc ? selectedDoc.title : '点击左侧文档查看切片内容。'}</p>
                         </div>
+                        {selectedDoc && (
+                            <button className="admin-button subtle" type="button" onClick={refreshSelectedDoc} disabled={!!working}>
+                                <FiRefreshCw />
+                                刷新
+                            </button>
+                        )}
                     </div>
                     <div className="admin-knowledge-chunks">
                         {!selectedDoc && <div className="admin-empty compact">未选择文档</div>}
