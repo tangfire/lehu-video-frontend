@@ -17,6 +17,18 @@ const requestTimers = new Map();
 
 const isFormData = (value) => typeof FormData !== 'undefined' && value instanceof FormData;
 
+const createRequestId = () => {
+    const random = Math.random().toString(16).slice(2, 10);
+    return `web-${Date.now()}-${random}`;
+};
+
+const withRequestIdMessage = (message, requestId) => {
+    if (!requestId || !window.location.pathname.startsWith('/admin')) {
+        return message;
+    }
+    return `${message}\n请求编号：${requestId}`;
+};
+
 // 生成请求唯一标识
 const generateRequestKey = (config) => {
     const url = config.url || '';
@@ -73,6 +85,8 @@ request.interceptors.request.use(
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
+        const requestId = config.headers['X-Request-ID'] || config.headers['x-request-id'] || createRequestId();
+        config.headers['X-Request-ID'] = requestId;
 
         if (isFormData(config.data)) {
             delete config.headers['Content-Type'];
@@ -105,7 +119,8 @@ request.interceptors.request.use(
         // 添加请求标记（对于聊天请求，使用不同的key避免冲突）
         config.metadata = {
             ...(config.metadata || {}),
-            requestKey
+            requestKey,
+            requestId
         };
         pendingRequests.set(requestKey, true);
 
@@ -138,12 +153,16 @@ request.interceptors.response.use(
         if (processedData && processedData.code === 0) {
             return processedData.data;
         } else if (processedData && processedData.code !== undefined) {
+            const requestId = processedData.request_id || response.headers?.['x-request-id'] || response.config?.metadata?.requestId || '';
             const error = {
                 code: processedData.code || -1,
-                message: processedData.message || '请求失败',
+                message: withRequestIdMessage(processedData.message || '请求失败', requestId),
                 data: processedData.data,
-                timestamp: processedData.timestamp
+                timestamp: processedData.timestamp,
+                request_id: requestId,
+                requestId
             };
+            console.error('[request failed]', error);
             return Promise.reject(error);
         } else {
             return processedData;
@@ -160,11 +179,15 @@ request.interceptors.response.use(
         }
 
         const message = error.response?.data?.message || error.message || '请求失败';
+        const requestId = error.response?.data?.request_id || error.response?.headers?.['x-request-id'] || error.config?.metadata?.requestId || '';
         const rejectError = {
             code: error.response?.status || 500,
-            message,
-            data: error.response?.data
+            message: withRequestIdMessage(message, requestId),
+            data: error.response?.data,
+            request_id: requestId,
+            requestId
         };
+        console.error('[request failed]', rejectError);
 
         return Promise.reject(rejectError);
     }
