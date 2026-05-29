@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { FiCheck, FiChevronDown, FiImage, FiPlus, FiSend, FiUploadCloud, FiVideo, FiX } from 'react-icons/fi';
+import { FiCheck, FiChevronDown, FiImage, FiPlus, FiSend, FiUploadCloud, FiX } from 'react-icons/fi';
 import { campusAdminApi } from '../../api/admin';
 import { excerpt, postTypeText, toArrayFromLines } from './adminUtils';
 import './Admin.css';
@@ -12,7 +12,6 @@ const initialForm = {
     content: '',
     images: '',
     cover_url: '',
-    video_url: '',
     is_official: true,
     is_featured: true,
     is_pinned: true,
@@ -293,7 +292,6 @@ const AdminCompose = () => {
             media_type: 'text',
             images: '',
             cover_url: '',
-            video_url: '',
             is_official: true,
             is_featured: true,
             is_pinned: true,
@@ -349,7 +347,7 @@ const AdminCompose = () => {
                 content: form.content,
                 images: nextImages,
                 cover_url: form.cover_url || nextImages[0] || '',
-                video_url: form.video_url,
+                video_url: '',
                 is_official: form.is_official,
                 is_featured: form.is_featured,
                 is_pinned: form.is_pinned,
@@ -464,7 +462,6 @@ const AdminCompose = () => {
                                     <select className="admin-select" value={form.media_type} onChange={(e) => update('media_type', e.target.value)}>
                                         <option value="text">纯文字</option>
                                         <option value="image">图文</option>
-                                        <option value="video">视频</option>
                                     </select>
                                 </div>
                                 <div className="admin-field">
@@ -474,10 +471,6 @@ const AdminCompose = () => {
                                 <div className="admin-field">
                                     <label>封面 URL</label>
                                     <input className="admin-input" value={form.cover_url} onChange={(e) => update('cover_url', e.target.value)} placeholder="为空时自动取第一张图片" />
-                                </div>
-                                <div className="admin-field">
-                                    <label>视频 URL</label>
-                                    <input className="admin-input" value={form.video_url} onChange={(e) => update('video_url', e.target.value)} placeholder="视频内容先填写 URL" />
                                 </div>
                             </div>
                         </div>
@@ -500,12 +493,9 @@ const AdminCompose = () => {
                             <div className="admin-preview-cover">
                                 {previewCover ? (
                                     <img src={previewCover} alt="" />
-                                ) : form.media_type === 'video' ? (
-                                    <div><FiVideo /> 视频封面</div>
                                 ) : (
                                     <div><FiImage /> 文字笔记</div>
                                 )}
-                                {form.media_type === 'video' && <span className="admin-video-badge"><FiVideo /> 视频</span>}
                             </div>
                             <div className="admin-preview-body">
                                 <h3>{form.title || '给新生看的实用标题'}</h3>
