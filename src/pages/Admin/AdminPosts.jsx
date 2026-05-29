@@ -216,7 +216,7 @@ const AdminPosts = () => {
                         <FiSearch />
                         查询
                     </button>
-                    <Link className="admin-button" to="/admin/assistant?tab=audit">
+                    <Link className="admin-button" to="/admin/audit">
                         <FiShield />
                         审核设置
                     </Link>

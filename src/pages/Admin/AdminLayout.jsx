@@ -9,6 +9,7 @@ const navItems = [
     { to: '/admin/posts', label: '内容工作台', icon: <FiFileText /> },
     { to: '/admin/compose', label: '运营发帖', icon: <FiEdit3 /> },
     { to: '/admin/moderation', label: '反馈与举报', icon: <FiBell /> },
+    { to: '/admin/audit', label: '审核设置', icon: <FiShield /> },
     { to: '/admin/assistant', label: 'e仔助手', icon: <FiCpu /> },
 ];
 
@@ -29,6 +30,7 @@ const titleMap = {
     '/admin/posts': '内容工作台',
     '/admin/compose': '运营发帖',
     '/admin/moderation': '反馈与举报',
+    '/admin/audit': '审核设置',
     '/admin/assistant': 'e仔助手',
     '/admin/notifications': '通知中心',
     '/admin/ai-replies': 'e仔回复',
@@ -46,6 +48,7 @@ const subtitleMap = {
     '/admin/posts': '管理首页内容流，处理置顶、精选、下架和内容状态。',
     '/admin/compose': '用深汕e仔发布官方攻略、问答和新生内容。',
     '/admin/moderation': '集中处理举报、用户反馈和评论状态，先清待办再看历史。',
+    '/admin/audit': '设置普通用户发帖后是否直接展示、进入人工审核或交给 AI 初审。',
     '/admin/assistant': '维护 e仔资料、查看自动回复状态，并测试知识库命中效果。',
     '/admin/notifications': '给小程序消息中心发送内测公告、维护提醒和活动通知。',
     '/admin/ai-replies': '查看 @深汕e仔 自动回复链路是否启用、是否失败，并手动重试。',

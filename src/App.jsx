@@ -32,6 +32,7 @@ import AdminPermissions from './pages/Admin/AdminPermissions.jsx';
 import AdminNotifications from './pages/Admin/AdminNotifications.jsx';
 import AdminModeration from './pages/Admin/AdminModeration.jsx';
 import AdminAssistant from './pages/Admin/AdminAssistant.jsx';
+import AdminAuditSettings from './pages/Admin/AdminAuditSettings.jsx';
 
 function AppProviders({ children }) {
     const location = useLocation();
@@ -132,6 +133,7 @@ function App() {
                             <Route path="posts" element={<AdminPosts />} />
                             <Route path="compose" element={<AdminCompose />} />
                             <Route path="moderation" element={<AdminModeration />} />
+                            <Route path="audit" element={<AdminAuditSettings />} />
                             <Route path="assistant" element={<AdminAssistant />} />
                             <Route path="notifications" element={<AdminNotifications />} />
                             <Route path="ai-replies" element={<AdminLegacyRedirect to="/admin/assistant" tab="status" />} />
